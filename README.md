@@ -103,6 +103,9 @@ $dir = .\scripts\pull_myq_apks.ps1
 # Find the opener, including ARP-visible devices that ignore ICMP.
 python tools\lan_probe.py --subnet <home-subnet>
 
+# Read router conntrack metadata without changing network state.
+.\scripts\capture_router_conntrack.ps1 -CandidateIp <candidate-ip>
+
 # Summarize DNS/TLS/endpoints from a router/AP/switch capture.
 python tools\pcap_summary.py capture.pcap --opener-ip <opener-ip>
 ```

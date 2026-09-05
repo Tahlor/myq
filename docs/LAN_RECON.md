@@ -80,6 +80,12 @@ No local status or command endpoint was found; the true-LAN track remains succes
 
 The router has no `tcpdump` or `tshark`, but it does include `/usr/sbin/conntrack` outside the default `PATH`. A read-only `conntrack -L` query and the `/proc/net/nf_conntrack` table both showed the confirmed MyQ candidate maintaining an `ESTABLISHED` TCP session to a public AWS endpoint on destination port `8883`; the filtered query currently reports one matching entry. This upgrades the outbound-port result from a port hypothesis to live connection evidence. There was no packet payload, TLS SNI, or MQTT framing available from conntrack, so the protocol classification remains **8883-only; MQTT unconfirmed**. No traffic was redirected or mutated.
 
+The observation is repeatable with `scripts/capture_router_conntrack.ps1`. It uses the existing Pi3-to-router SSH path, writes raw metadata only to ignored `captures/lan/`, and emits a sanitized entry count. It does not install a package or change router, opener, DNS, firewall, or forwarding state:
+
+```powershell
+.\scripts\capture_router_conntrack.ps1 -CandidateIp <candidate-ip>
+```
+
 **Important:** no listening TCP ports does not rule out a myQ device. An opener can operate as an outbound-only TLS/MQTT client.
 
 ## Superbox capture-tool check — 2026-09-05

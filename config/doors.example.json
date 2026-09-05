@@ -1,0 +1,15 @@
+{
+  "doors": [
+    {
+      "name": "Garage Door",
+      "state": {
+        "resource_id": "REPLACE_AFTER_DEBUG_TREE"
+      },
+      "open": null,
+      "close": null,
+      "toggle": {
+        "resource_id": "REPLACE_AFTER_DEBUG_TREE"
+      }
+    }
+  ]
+}

@@ -80,11 +80,18 @@ class MyQDriver:
 
     @staticmethod
     def infer_state_tokens(xml: str) -> list[str]:
+        """Find standalone state labels without treating action text as state.
+
+        `Open garage` is a command/accessibility description, not evidence that
+        the door is open. Explicit configured state selectors may still use the
+        more permissive `normalize_state` method.
+        """
         found: list[str] = []
         for node in MyQDriver.visible_nodes(xml):
             for value in (node["text"], node["description"]):
-                state = MyQDriver.normalize_state(value)
-                if state in {"open", "closed", "opening", "closing", "stopped", "offline"}:
+                cleaned = " ".join(value.strip().lower().replace("_", " ").split())
+                state = _STATE_MAP.get(cleaned)
+                if state:
                     found.append(state)
         return found
 

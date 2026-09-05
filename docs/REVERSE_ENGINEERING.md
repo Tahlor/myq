@@ -36,6 +36,22 @@ myq-cloud serve   # default port 8766
 
 The direct REST facade exposes explicit open/close operations only; it does not use a toggle. Read-only status is available globally at `GET /status` and for a single account at `GET /accounts/{account_id}/status`.
 
+## Current APK static cross-check — 5.243.1.73243
+
+The verified APK installed on the SuperBOX is version `5.243.1.73243`. A local decompilation of that exact APK independently confirms the current cloud route families and production hosts:
+
+- authentication uses `https://partner-identity.myq-cloud.com/connect/token`;
+- account APIs use `accounts.myq-cloud.com`;
+- device APIs use `devices.myq-cloud.com`;
+- door-opener APIs use `account-devices-gdo.myq-cloud.com`;
+- the v6 Retrofit service includes read access to `.../api/{apiVersion}/accounts/{accountId}/door_openers/{serialNumber}` and explicit `PUT` routes ending in `/open` and `/close`;
+- the app's version enum includes `v6.0`, while the newer device-enumeration path used by the clean-room client remains a separate live-evidence question;
+- common request metadata includes `MyQApplicationId`, `Culture`, `BrandId`, `ApiVersion: 4.1`, `App-Version`, `Accept: application/json`, and an Android model/release user agent.
+
+The same APK's OAuth parameter enum uses client id `ANDROID_CGI_MYQ`, scope `MyQ_Residential offline_access`, redirect URI `com.myqops://android`, and PKCE `S256`; refresh-token grants are implemented alongside authorization-code grants. This is a concrete reason to keep the clean-room client's client id and app identity configurable: the existing direct-refresh evidence came from a different iOS-style client identity and is not proof that the two refresh-token contexts are interchangeable.
+
+The APK also contains TCP-8883 diagnostic text and App Check/Integrity feature flags. Their static presence is not evidence that every current request is enforced by attestation; that distinction still requires authenticated runtime observation. Raw APK/decompiler output remains local and ignored.
+
 ## Other references
 
 Historical clients proved the MyQ cloud API was sufficient for account login, device enumeration, state and door commands before Chamberlain's anti-automation changes:

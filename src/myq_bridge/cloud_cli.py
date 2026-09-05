@@ -1,0 +1,149 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+import uvicorn
+from fastapi import Depends, FastAPI, Header, HTTPException
+
+from .cloud import (
+    MyQAuthError,
+    MyQCloudClient,
+    MyQCloudError,
+    SessionStore,
+    load_cloud_session,
+)
+
+
+def _store() -> SessionStore:
+    return SessionStore(os.environ.get("MYQ_CLOUD_SESSION", "config/cloud_session.json"))
+
+
+def _client() -> MyQCloudClient:
+    store = _store()
+    return MyQCloudClient(load_cloud_session(store), on_session_updated=store.save)
+
+
+def _dump(value: Any) -> None:
+    print(json.dumps(value, indent=2, sort_keys=True))
+
+
+def create_app(api_key: str) -> FastAPI:
+    if len(api_key) < 16:
+        raise RuntimeError("MYQ_API_KEY must be at least 16 characters")
+
+    app = FastAPI(title="myQ direct cloud bridge", version="0.1.0")
+    client = _client()
+
+    def auth(x_api_key: str | None = Header(default=None)) -> None:
+        import secrets
+
+        if not x_api_key or not secrets.compare_digest(api_key, x_api_key):
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
+    protected = Depends(auth)
+
+    @app.on_event("shutdown")
+    def close_client() -> None:
+        client.close()
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "backend": "direct-cloud"}
+
+    def translate(call):
+        try:
+            return call()
+        except MyQAuthError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        except MyQCloudError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.get("/accounts", dependencies=[protected])
+    def accounts() -> list[dict[str, Any]]:
+        return translate(client.accounts)
+
+    @app.get("/accounts/{account_id}/devices", dependencies=[protected])
+    def devices(account_id: str) -> list[dict[str, Any]]:
+        return translate(lambda: client.devices(account_id))
+
+    @app.post(
+        "/accounts/{account_id}/doors/{door_opener_id}/open",
+        dependencies=[protected],
+    )
+    def open_door(account_id: str, door_opener_id: str) -> dict[str, bool]:
+        translate(lambda: client.door_action(account_id, door_opener_id, "open"))
+        return {"ok": True}
+
+    @app.post(
+        "/accounts/{account_id}/doors/{door_opener_id}/close",
+        dependencies=[protected],
+    )
+    def close_door(account_id: str, door_opener_id: str) -> dict[str, bool]:
+        translate(lambda: client.door_action(account_id, door_opener_id, "close"))
+        return {"ok": True}
+
+    @app.post(
+        "/accounts/{account_id}/doors/{door_opener_id}/remotes/{state}",
+        dependencies=[protected],
+    )
+    def remotes(account_id: str, door_opener_id: str, state: str) -> dict[str, bool]:
+        if state not in {"enabled", "disabled"}:
+            raise HTTPException(status_code=400, detail="state must be enabled or disabled")
+        # myQ calls the vacation/remote-disable state 'lock mode'.
+        translate(
+            lambda: client.set_lock_mode(
+                account_id, door_opener_id, enabled=(state == "disabled")
+            )
+        )
+        return {"ok": True}
+
+    return app
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Direct MyQ cloud client")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("refresh", help="Refresh and persist OAuth tokens")
+    sub.add_parser("accounts", help="List accounts")
+
+    devices = sub.add_parser("devices", help="List devices for an account")
+    devices.add_argument("account_id")
+
+    for action in ("open", "close"):
+        command = sub.add_parser(action, help=f"{action.title()} a door explicitly")
+        command.add_argument("account_id")
+        command.add_argument("door_opener_id")
+
+    serve = sub.add_parser("serve", help="Expose the direct client as a local REST API")
+    serve.add_argument("--host", default=os.environ.get("MYQ_BIND", "0.0.0.0"))
+    serve.add_argument("--port", type=int, default=int(os.environ.get("MYQ_PORT", "8766")))
+
+    args = parser.parse_args()
+
+    if args.command == "serve":
+        api_key = os.environ.get("MYQ_API_KEY", "")
+        uvicorn.run(create_app(api_key), host=args.host, port=args.port)
+        return
+
+    with _client() as client:
+        if args.command == "refresh":
+            client.refresh()
+            _dump({"ok": True, "session_file": str(_store().path)})
+        elif args.command == "accounts":
+            _dump(client.accounts())
+        elif args.command == "devices":
+            _dump(client.devices(args.account_id))
+        elif args.command in {"open", "close"}:
+            client.door_action(args.account_id, args.door_opener_id, args.command)
+            _dump({"ok": True, "action": args.command})
+        else:
+            parser.error(f"Unknown command {args.command}")
+
+
+if __name__ == "__main__":
+    main()

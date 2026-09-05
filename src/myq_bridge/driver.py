@@ -165,15 +165,24 @@ class MyQDriver:
             if target in {"open", "closed"} and before == target:
                 return {"ok": True, "changed": False, "before": before, "after": before}
 
-            selector = (
+            direct_selector = (
                 door.open if target == "open" else
                 door.close if target == "closed" else
-                door.toggle
+                None
             )
+            selector = direct_selector if target != "toggle" else door.toggle
             if selector is None and target in {"open", "closed"}:
                 selector = door.toggle
             if selector is None:
                 raise RuntimeError(f"No selector configured for {door.name!r} -> {target}")
+            if (
+                target in {"open", "closed"}
+                and direct_selector is None
+                and before not in {"open", "closed"}
+            ):
+                raise RuntimeError(
+                    f"Refusing blind toggle for {door.name!r}: current state is {before!r}"
+                )
 
             self._click(selector)
 

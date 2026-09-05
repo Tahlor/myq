@@ -22,7 +22,7 @@ APKMirror's manually reviewed universal APK was downloaded through the existing 
 - installed successfully on the Superbox (`versionCode=73243`, APK signing scheme v2);
 - Android reported the Chamberlain certificate fingerprint `3C:49:83:4E:C2:79:0E:B4:72:33:08:04:01:A5:D3:7B:35:4B:D5:AC:63:9B:EE:AF:BB:EF:7C:56:20:05:E4:0C`.
 
-The app launched to `ConsentToTermsActivity`. Account authentication is intentionally waiting for the owner to accept the current Terms of Service and Privacy Policy on the Superbox. No credentials have been copied into the repository, terminal commands, logs, or screenshots.
+The app initially launched to `ConsentToTermsActivity`; the current Terms of Service and Privacy Policy have since been accepted on the Superbox. No credentials have been copied into the repository, terminal commands, logs, or screenshots.
 
 ## Live native bridge install — 2026-09-05
 
@@ -31,6 +31,10 @@ The bridge was built locally with JDK 17, Gradle 8.9, Android platform 35, and b
 The first authenticated probe exposed an Android 11+ package-visibility issue: `getLaunchIntentForPackage()` could not see the installed myQ package. The bridge manifest now declares a package query for `com.chamberlain.android.liftmaster.myq`; after rebuilding and reinstalling, the read-only probe reached `WelcomeActivity` normally. No door configuration is installed yet, and no status or command endpoint has been used against a physical door.
 
 The generated bridge API key is stored locally in ignored `config/myq_credentials.local.json`. Account credentials remain pending a Bitwarden vault unlock; neither has been committed.
+
+## Live login handoff — 2026-09-05
+
+The native bridge was revalidated after the APK and bridge installs: `/health` returned `ok`, authenticated `/debug/nodes` returned six nodes, and the foreground activity was `WelcomeActivity`. The bridge then opened the app's Login button, which launched Chrome's custom-tab OAuth flow for the current myQ identity service. No username, password, OAuth code, access token, refresh token, or garage command was entered or emitted. The Superbox is currently positioned at the login handoff and is ready for the owner-authorized credential step.
 
 Our existing SuperBOX S7MAX is preferable to a new Android VM because it is already an always-on Android device on the LAN with remote ADB. This repo therefore has two implementations of the same bridge contract:
 
@@ -149,7 +153,7 @@ Then use Track B1 to recover the current cloud calls. If authenticated requests 
 
 ## Current live unknowns
 
-- Does the owner-approved consent flow and login complete on the S7MAX's 32-bit ARM Android 12 build?
+- Does the owner-authorized login complete on the S7MAX's 32-bit ARM Android 12 build?
 - Does its login WebView work with the Superbox's current WebView, or does WebView need an update?
 - Does the app reject the Superbox's exposed `su` binary?
 - Which MyQ accessibility resource IDs are stable on the real dashboard?

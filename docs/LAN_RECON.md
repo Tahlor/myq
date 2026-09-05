@@ -55,6 +55,10 @@ Targeted read-only checks against that probable device found:
 
 This proves a local HTTP setup surface exists on the probable device, but not local door status or control. The device identity still needs confirmation from the router/AP client list, a normal supported Wi-Fi disconnect/reconnect observation, or scoped outbound capture. The exact IP, MAC and raw responses remain in ignored local captures only.
 
+## Follow-up read-only check — 2026-09-05
+
+A fresh scan saw the same `MyQ-*` hostname among the LAN neighbors. The targeted port result was unchanged: TCP 80 was open and TCP 443, 1883, 8080, 8443 and 8883 were not reachable. `GET /`, `/config.html`, `/config_hub.html` and `/connect_hub.html` again returned `200`; the setup pages again exposed only the previously recorded route names. The OUI did not match the current Chamberlain list, and no opener disconnect/reconnect or packet capture was performed, so the device remains a probable rather than positively identified opener.
+
 **Important:** no listening TCP ports does not rule out a myQ device. An opener can operate as an outbound-only TLS/MQTT client.
 
 After a likely candidate is found, confirm it by temporarily disconnecting/reconnecting the opener from Wi-Fi or comparing the router's device list. Do not identify a device solely from a guessed hostname.

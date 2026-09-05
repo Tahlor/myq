@@ -2,35 +2,52 @@
 
 Software-only integration work for Chamberlain/LiftMaster myQ devices. The goal is reliable home-automation control **without adding hardware to the garage opener**.
 
-## Tracks
+## Architecture
 
-### A. Official-app bridge — working architecture to validate live
+We are pursuing three software layers in parallel, ordered from easiest to most independent:
 
-Run the official myQ Android app on the existing SuperBOX S7MAX and drive it through Android's accessibility surface. `android_bridge/` is an on-device companion that exposes a small authenticated REST API directly from the Superbox, so the steady-state path can be:
+1. **Official-app bridge (working code, live validation pending)**
+   `Home automation -> Superbox:8765 -> official myQ Android app -> myQ cloud -> opener`
+2. **Direct-cloud bridge (implemented, initial authorized session pending)**
+   `Home automation -> local daemon:8766 -> myQ v6 cloud -> opener`
+3. **True local control (protocol-recovery track)**
+   `Home automation -> opener on LAN`, ideally with no Chamberlain cloud.
 
-```text
-Home Assistant / automations -> Superbox:8765 -> official myQ app -> myQ cloud -> opener
+The first two are complementary: the official app can remain a compatibility/bootstrap fallback even if direct cloud calls become the normal path.
+
+## Current 2026 direct-cloud finding
+
+A new August 2026 Home Assistant integration (`vector-sec/chamberlain-myq-hacs`) demonstrates the current v6 account/device/action endpoints and a normal OAuth refresh-token grant. We clean-room implemented those protocol facts in `src/myq_bridge/cloud.py`; we do not vendor or copy that repository's implementation.
+
+Current defaults are configurable but start from the working August 2026 client identity:
+
+- client id: `IOS_CGI_MYQ`
+- app version: `5.315.0.66076`
+- token endpoint: `partner-identity.myq-cloud.com/connect/token`
+- account/device APIs: current v6/v6.2 MyQ cloud endpoints
+
+This is important because the observed refresh and door-command flow does **not** require Play Integrity/App Check fields. The remaining question is how best to bootstrap the first authorized access/refresh-token pair from our own authorized account. Do not commit tokens.
+
+Once a local authorized session exists in ignored `config/cloud_session.json` (copy `config/cloud_session.example.json`), the direct client can:
+
+```powershell
+# Refresh + rotate the session normally.
+myq-cloud refresh
+
+# Discover account/device IDs.
+myq-cloud accounts
+myq-cloud devices <account-id>
+
+# Run a local authenticated REST facade on port 8766.
+$env:MYQ_API_KEY = '<local-secret>'
+myq-cloud serve
 ```
 
-The Python/UIAutomator bridge under `src/myq_bridge/` remains useful for calibration, diagnostics, and fallback testing, but it is not required in the intended steady state.
+The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle.
 
-The first bring-up target is myQ `5.243.1.73243`, which multiple users reported in 2026 can authenticate in Android environments that fail newer MyQ Play Integrity checks. Once authenticated, test current versions and session persistence rather than assuming that old build must remain permanently installed.
+## Official-app / Superbox bridge
 
-### B. Protocol recovery — preferred end state
-
-Use the official app and the Wi-Fi opener as ground truth to recover:
-
-1. current app/cloud endpoints and request semantics;
-2. whether authenticated app requests can be replayed directly by our own client;
-3. the opener's LAN identity and exposed services;
-4. its outbound DNS/TLS/MQTT behavior;
-5. whether the opener can be redirected to a local broker/service without firmware or hardware changes.
-
-The best outcome is true LAN control with no Chamberlain cloud. A direct but cloud-backed client is still an improvement over UI automation. Track A stays available as the compatibility fallback.
-
-## Existing hardware we reuse
-
-The already-owned **SuperBOX S7MAX** documented in `Tahlor/superbox` is the Android host:
+The existing **SuperBOX S7MAX** is our Android host:
 
 - Android 12 / API 31
 - 32-bit ARM (`armeabi-v7a`)
@@ -38,66 +55,59 @@ The already-owned **SuperBOX S7MAX** documented in `Tahlor/superbox` is the Andr
 - persistent ADB reachable on the home LAN
 - logcat, app sideloading, and Frida-server deployment already established
 
-No fixed ADB IP/port is authoritative; use `scripts/connect_superbox.ps1`.
+`android_bridge/` is an on-device companion accessibility service and authenticated HTTP server. GitHub CI builds it as artifact **`myq-superbox-bridge-debug`**.
 
-## First live run
+First live run:
 
 ```powershell
-# 1. Connect to the Superbox.
 $serial = .\scripts\connect_superbox.ps1
 
-# 2. Install a locally obtained official myQ APK / split-APK directory.
+# Install a locally obtained official myQ APK/split set; authenticate interactively.
 .\scripts\install_myq_superbox.ps1 -PackagePath C:\path\to\myq -AdbSerial $serial
-# Complete myQ login interactively and verify the real door is visible.
 
-# 3. Build/install our native companion. It prints the generated API key.
+# Build/install our companion and get its local API key.
 $key = .\scripts\build_install_android_bridge.ps1 -AdbSerial $serial | Select-Object -Last 1
-
-# 4. Inspect the live MyQ accessibility tree from the Superbox itself.
 $headers = @{ 'X-API-Key' = $key }
-Invoke-RestMethod http://<superbox-ip>:8765/debug/nodes -Headers $headers
 
-# 5. Copy config/doors.example.json -> ignored config/doors.json,
-#    fill in stable live selectors, then push it without rebuilding.
+# Inspect current myQ UI nodes and calibrate state/action selectors.
+Invoke-RestMethod http://<superbox-ip>:8765/debug/nodes -Headers $headers
 .\scripts\push_bridge_config.ps1 -AdbSerial $serial -ConfigPath config\doors.json
 
-# 6. Read state before attempting any command.
+# Read state before any physical command.
 Invoke-RestMethod http://<superbox-ip>:8765/status -Headers $headers
 ```
 
-The native API supports `GET /health`, `GET /status`, `GET /debug/nodes`, and authenticated `POST /doors/{name}/{open|close|toggle}`.
+The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
 
-## Reverse-engineering tools
+## Protocol-recovery tooling
 
 ```powershell
-# Pull the exact installed official APK/splits and inspect them with JADX.
+# Pull/decompile the exact installed official app.
 $dir = .\scripts\pull_myq_apks.ps1
 .\scripts\decompile_myq.ps1 -ApkDirectory $dir
 
-# Capture app-only logcat metadata.
+# Capture app metadata without committing account credentials/tokens.
 .\scripts\capture_myq_logcat.ps1 -Seconds 60
-
-# Reuse the Superbox repo's Frida-server installer, then trace URL/socket metadata.
 .\scripts\trace_myq_network.ps1 -InstallFridaServer
 
-# Discover likely Chamberlain devices on the LAN.
+# Find the opener, including ARP-visible devices that ignore ICMP.
 python tools\lan_probe.py --subnet <home-subnet>
 
 # Summarize DNS/TLS/endpoints from a router/AP/switch capture.
 python tools\pcap_summary.py capture.pcap --opener-ip <opener-ip>
 ```
 
-Raw captures, APKs, tokens, UI dumps and pcaps stay ignored. Commit only sanitized interoperability findings.
+Current Chamberlain support documentation says myQ devices require outbound **TCP 8883** to communicate with MyQ servers. Because 8883 is conventionally MQTT-over-TLS, it is the highest-priority opener traffic to capture, but the port number alone is not treated as proof of MQTT.
 
-## Safety / security
+## Safety / secrets
 
-A garage door is a physical access-control device. Both bridge implementations:
+A garage door is a physical access-control device. The project:
 
-- require an API key for control/state endpoints;
-- perform no automatic geolocation opening by default;
-- serialize commands;
-- avoid acting when the requested state is already observed;
-- refuse an explicit-state request that would require a **blind toggle** while state is unknown;
-- keep captured credentials/tokens/APKs/screenshots/UI dumps/pcaps out of Git.
+- requires an API key on local control/state APIs;
+- performs no geolocation-triggered opening by default;
+- serializes UI commands;
+- no-ops when an explicit requested state is already observed;
+- refuses a UI toggle when current state is unknown;
+- keeps credentials, rotating OAuth tokens, APKs, screenshots/UI dumps, pcaps and raw captures out of Git.
 
-See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`, and the open GitHub issues for the live evidence gates.
+See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`, and issues #1–#3 for live evidence gates.

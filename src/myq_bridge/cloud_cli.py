@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 from typing import Any
 
 import uvicorn
@@ -62,6 +61,10 @@ def create_app(api_key: str) -> FastAPI:
         except MyQCloudError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @app.get("/status", dependencies=[protected])
+    def status() -> dict[str, Any]:
+        return {"backend": "direct-cloud", "doors": translate(client.door_status)}
+
     @app.get("/accounts", dependencies=[protected])
     def accounts() -> list[dict[str, Any]]:
         return translate(client.accounts)
@@ -110,6 +113,7 @@ def main() -> None:
 
     sub.add_parser("refresh", help="Refresh and persist OAuth tokens")
     sub.add_parser("accounts", help="List accounts")
+    sub.add_parser("status", help="List normalized garage-door status")
 
     devices = sub.add_parser("devices", help="List devices for an account")
     devices.add_argument("account_id")
@@ -136,6 +140,8 @@ def main() -> None:
             _dump({"ok": True, "session_file": str(_store().path)})
         elif args.command == "accounts":
             _dump(client.accounts())
+        elif args.command == "status":
+            _dump(client.door_status())
         elif args.command == "devices":
             _dump(client.devices(args.account_id))
         elif args.command in {"open", "close"}:

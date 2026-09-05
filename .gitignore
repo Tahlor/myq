@@ -2,6 +2,7 @@
 .env
 *.local.json
 config/doors.json
+config/cloud_session.json
 captures/
 artifacts/
 

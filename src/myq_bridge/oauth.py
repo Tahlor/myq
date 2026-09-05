@@ -18,7 +18,16 @@ from urllib.parse import quote, urlencode
 
 import httpx
 
-from .cloud import AUTH_URL, CloudSession, MyQAuthError, MyQCloudError
+from .cloud import (
+    ANDROID_API_VERSION,
+    ANDROID_APPLICATION_ID,
+    ANDROID_BRAND_ID,
+    ANDROID_CULTURE,
+    AUTH_URL,
+    CloudSession,
+    MyQAuthError,
+    MyQCloudError,
+)
 
 
 ANDROID_CLIENT_ID = "ANDROID_CGI_MYQ"
@@ -100,6 +109,10 @@ def exchange_authorization_code(
         "Content-Type": "application/x-www-form-urlencoded",
         "App-Version": app_version,
         "User-Agent": user_agent,
+        "MyQApplicationId": ANDROID_APPLICATION_ID,
+        "Culture": ANDROID_CULTURE,
+        "BrandId": ANDROID_BRAND_ID,
+        "ApiVersion": ANDROID_API_VERSION,
     }
     if app_check_token:
         headers["Firebase-AppCheck-Token"] = app_check_token

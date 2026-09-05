@@ -30,11 +30,15 @@ The bridge was built locally with JDK 17, Gradle 8.9, Android platform 35, and b
 
 The first authenticated probe exposed an Android 11+ package-visibility issue: `getLaunchIntentForPackage()` could not see the installed myQ package. The bridge manifest now declares a package query for `com.chamberlain.android.liftmaster.myq`; after rebuilding and reinstalling, the read-only probe reached `WelcomeActivity` normally. No door configuration is installed yet, and no status or command endpoint has been used against a physical door.
 
-The generated bridge API key is stored locally in ignored `config/myq_credentials.local.json`. Account credentials remain pending a Bitwarden vault unlock; neither has been committed.
+The generated bridge API key and the owner-authorized account credentials are stored locally in ignored `config/myq_credentials.local.json`; neither has been committed.
 
 ## Live login handoff — 2026-09-05
 
 The native bridge was revalidated after the APK and bridge installs: `/health` returned `ok`, authenticated `/debug/nodes` returned six nodes, and the foreground activity was `WelcomeActivity`. The bridge then opened the app's Login button, which launched Chrome's custom-tab OAuth flow for the current myQ identity service. No username, password, OAuth code, access token, refresh token, or garage command was entered or emitted. The Superbox is currently positioned at the login handoff and is ready for the owner-authorized credential step.
+
+## Authorized credential bootstrap — 2026-09-05
+
+The existing Pi3 Broadlink deployment was reachable through its configured SSH profile. Its expected `/home/pi/bashrc/secure/credentials_myq` file was present and had the two-line email/password shape used by the Broadlink controller. The values were copied in memory into ignored `config/myq_credentials.local.json` with `scripts/import_pi3_myq_credentials.ps1`, preserving the bridge API key. The temporary raw copy was removed immediately after import. Secret values were not printed, committed, or added to documentation.
 
 Our existing SuperBOX S7MAX is preferable to a new Android VM because it is already an always-on Android device on the LAN with remote ADB. This repo therefore has two implementations of the same bridge contract:
 

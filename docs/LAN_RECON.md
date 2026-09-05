@@ -59,6 +59,16 @@ This proves a local HTTP setup surface exists on the probable device, but not lo
 
 A fresh scan saw the same `MyQ-*` hostname among the LAN neighbors. The targeted port result was unchanged: TCP 80 was open and TCP 443, 1883, 8080, 8443 and 8883 were not reachable. `GET /`, `/config.html`, `/config_hub.html` and `/connect_hub.html` again returned `200`; the setup pages again exposed only the previously recorded route names. The OUI did not match the current Chamberlain list, and no opener disconnect/reconnect or packet capture was performed, so the device remains a probable rather than positively identified opener.
 
+## Router lease confirmation — 2026-09-05
+
+A read-only SSH query through the existing Pi3-to-router path found the same `MyQ-D5F` hostname and matching MAC prefix in the router's DHCP lease table for the candidate already observed locally. The device's port-80 `connect_hub.html` page also exposes myQ-branded hub and serial-registration fields. This confirms a current MyQ network device and gives high confidence that it is the owner's opener/hub, while the exact opener role still lacks a normal Wi-Fi disconnect/reconnect or outbound-traffic correlation. Exact IP/MAC values remain only in ignored captures.
+
+No local status or command endpoint was found; the true-LAN track remains success level **L0 (cloud-only)** pending an approved outbound capture point.
+
+## Router conntrack observation — 2026-09-05
+
+The router has no `tcpdump`, `tshark`, or `conntrack` executable, but its read-only `/proc/net/nf_conntrack` table showed the confirmed MyQ candidate maintaining an `ESTABLISHED` TCP session to a public AWS endpoint on destination port `8883`. This upgrades the outbound-port result from a port hypothesis to live connection evidence. There was no packet payload, TLS SNI, or MQTT framing available from conntrack, so the protocol classification remains **8883-only; MQTT unconfirmed**. No traffic was redirected or mutated.
+
 **Important:** no listening TCP ports does not rule out a myQ device. An opener can operate as an outbound-only TLS/MQTT client.
 
 ## Superbox capture-tool check — 2026-09-05

@@ -2,15 +2,20 @@
 
 ## Why this is first
 
-A June 2026 working implementation demonstrated that the official myQ Android app can be automated through UIAutomator and exposed as a local REST API. The author used ReDroid; the important primitive is not ReDroid itself, but **driving the real app through the Android accessibility/UI tree**.
+A June 2026 working implementation demonstrated that the official myQ Android app can be automated through UIAutomator and exposed as a local REST API. The author used ReDroid; the important primitive is **driving the real app through Android's accessibility/UI tree**, not ReDroid itself.
 
 Reference: https://www.reddit.com/r/myq/comments/1u1oqvn/
 
-The same thread reports that myQ `5.243.1.73243` can authenticate without the hardware-backed Play Integrity requirement introduced in later builds, and a separate user confirmed the approach still worked in late August 2026.
+The same thread reports that myQ `5.243.1.73243` can authenticate without the hardware-backed Play Integrity requirement introduced in later builds, and another user confirmed the overall approach still worked in late August 2026.
 
-Our existing SuperBOX S7MAX is preferable to a new ReDroid VM for initial work because it is already an always-on Android device on the LAN and already has working remote ADB.
+Our existing SuperBOX S7MAX is preferable to a new Android VM because it is already an always-on Android device on the LAN with remote ADB. This repo therefore has two implementations of the same bridge contract:
 
-## Phase A1 — install and authenticate
+1. `android_bridge/` — **preferred steady-state path**. Accessibility service + authenticated HTTP API run directly on the Superbox; no PC is required after setup.
+2. `src/myq_bridge/` — Python/UIAutomator bring-up and diagnostic fallback. Useful for inspecting the UI and testing selectors rapidly from a development machine.
+
+Both use the same `config/doors.json` selector schema.
+
+## Phase A1 — install and authenticate official myQ
 
 1. Obtain myQ `5.243.1.73243` locally. Do not commit the APK.
 2. Connect:
@@ -25,72 +30,105 @@ Our existing SuperBOX S7MAX is preferable to a new ReDroid VM for initial work b
    .\scripts\install_myq_superbox.ps1 -PackagePath C:\local\myq -AdbSerial $serial
    ```
 
-4. Complete account authentication interactively on the TV / via a trusted screen-control path.
-5. Verify the garage door is visible and its status updates.
+4. Complete account authentication interactively on the TV / through a trusted screen-control path.
+5. Verify the real garage door is visible and its status updates.
 
-Do **not** change `ro.secure`, `ro.debuggable`, remove `su`, or modify the Superbox system image preemptively. This box is shared infrastructure for other projects. First observe whether the older app actually objects to the existing root state.
+Do **not** change `ro.secure`, `ro.debuggable`, remove `su`, or modify the Superbox system image preemptively. The box is shared infrastructure for other projects. First observe whether the older app actually objects to its existing root state.
 
-## Phase A2 — calibrate the UI bridge
+## Phase A2 — install the native LAN bridge
 
-Create a Python environment and install the package:
+Build/install our companion app:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-Copy-Item config\doors.example.json config\doors.json
-$env:MYQ_ADB_SERIAL = (.\scripts\connect_superbox.ps1)
-$env:MYQ_API_KEY = ([guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N"))
-python -m myq_bridge
+$key = .\scripts\build_install_android_bridge.ps1 -AdbSerial $serial | Select-Object -Last 1
+$headers = @{ 'X-API-Key' = $key }
 ```
 
-Fetch the visible accessibility tree:
+The installer:
+
+- builds `android_bridge/app`;
+- installs `com.tahlor.myqbridge`;
+- stores the supplied/generated API key in the app's private preferences;
+- **appends** our accessibility service to Android's enabled service list rather than replacing existing services;
+- enables accessibility globally if requested;
+- optionally pushes an already-calibrated `doors.json`;
+- prints the Superbox LAN API endpoint and secret.
+
+The accessibility service is package-scoped to `com.chamberlain.android.liftmaster.myq`. It is not a generic remote UI-control service.
+
+If automatic accessibility enablement is undesirable for a test, pass `-NoEnableAccessibility` and enable **myQ LAN Bridge** manually in Android Accessibility settings.
+
+## Phase A3 — calibrate selectors
+
+Before any command, inspect the dashboard hierarchy through the native bridge:
 
 ```powershell
-$headers = @{ "X-API-Key" = $env:MYQ_API_KEY }
-Invoke-RestMethod http://127.0.0.1:8765/debug/nodes -Headers $headers
+Invoke-RestMethod http://<superbox-ip>:8765/debug/nodes -Headers $headers
 ```
 
 Find stable selectors for:
 
-- the door name;
-- the current state (`Open`, `Closed`, `Opening`, `Closing`);
-- the action button(s).
+- each door's current-state label (`Open`, `Closed`, `Opening`, `Closing`);
+- the corresponding explicit action buttons, if separate buttons exist;
+- otherwise the door's toggle/action element.
 
-Prefer `resource-id` over display text when possible. Put the resulting selectors in ignored `config/doors.json`.
+Prefer `resource_id` over display text when possible. Copy `config/doors.example.json` to ignored `config/doors.json`, fill the selectors, then push it:
 
-The bridge supports separate `open` / `close` selectors or a single `toggle` selector. When a toggle is used for a requested explicit state, it reads the current state first and refuses to click if the door is already in the requested state.
+```powershell
+.\scripts\push_bridge_config.ps1 -AdbSerial $serial -ConfigPath config\doors.json
+```
 
-## Phase A3 — expose to home automation
+The native bridge reloads this file on every request, so selector changes do not require rebuild/restart.
 
-Endpoints:
+### Optional Python calibration fallback
 
-- `GET /health` — no secret, liveness only
+If native accessibility output is insufficient during bring-up:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\pip install -e ".[dev]"
+$env:MYQ_ADB_SERIAL = $serial
+$env:MYQ_API_KEY = ([guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N"))
+python -m myq_bridge
+```
+
+Then inspect `http://127.0.0.1:8765/debug/nodes`. The Python implementation also exposes raw `/debug/tree`.
+
+## Phase A4 — verify read-only state, then one safe command
+
+Native endpoints:
+
+- `GET /health` — unauthenticated liveness only
 - `GET /status` — authenticated state
+- `GET /debug/nodes` — authenticated compact accessibility hierarchy
 - `POST /doors/{name}/open`
 - `POST /doors/{name}/close`
 - `POST /doors/{name}/toggle`
-- `GET /debug/tree` — authenticated raw hierarchy for calibration
-- `GET /debug/nodes` — authenticated compact hierarchy
 
 Every non-health request requires `X-API-Key`.
 
-For production, bind the bridge only to the home-automation interface/VLAN and firewall port `8765` to trusted clients.
+Verify `GET /status` repeatedly before sending a command. During the first command test, physically observe the door and request an **explicit state** rather than `toggle`.
 
-## Phase A4 — remove UI fragility
+Both implementations serialize operations. If an explicit `open`/`close` request has only a toggle selector available, the bridge reads current state first and **refuses to click when state is unknown**. It also no-ops if the requested state is already observed.
 
-Once the app is working, pull its installed packages:
+For production, firewall TCP `8765` to trusted home-automation clients / VLANs.
+
+## Phase A5 — remove UI fragility
+
+Once the app is authenticated and stable, pull its installed packages:
 
 ```powershell
 .\scripts\pull_myq_apks.ps1
 ```
 
-Then use Track B1 to recover the actual cloud calls. If we can replay the authenticated requests directly, replace UI automation with a direct client while keeping the official app available for re-authentication/session bootstrap.
+Then use Track B1 to recover the current cloud calls. If authenticated requests can be replayed directly, replace accessibility automation with a direct client behind the same conceptual API while retaining the official app for bootstrap/recovery.
 
-## Current unknowns to resolve live
+## Current live unknowns
 
 - Does `5.243.1.73243` install and run normally on the S7MAX's 32-bit ARM Android 12 build?
 - Does its login WebView work with the Superbox's current WebView, or does WebView need an update?
 - Does the app reject the Superbox's exposed `su` binary?
-- Which accessibility resource IDs are stable on the dashboard?
-- Does the authenticated session persist through app restart and Superbox reboot?
-- Can a newer myQ APK reuse the authenticated session created by the old build without a new Integrity check?
+- Which MyQ accessibility resource IDs are stable on the real dashboard?
+- Does the native service remain bound and its TCP server recover after Superbox reboot?
+- Does the authenticated MyQ session persist through app restart and Superbox reboot?
+- Can a newer myQ APK reuse a session created by the older build without a new Integrity check?

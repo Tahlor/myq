@@ -6,6 +6,17 @@ Determine whether the existing myQ Wi-Fi opener can be controlled by software on
 
 This is a protocol-recovery problem, not an assumption that a friendly HTTP API already exists.
 
+## Known network lead: TCP 8883
+
+Current Chamberlain support documentation explicitly says **myQ devices use TCP port 8883 to communicate with myQ servers** and may appear offline when that port is blocked:
+
+- https://support.chamberlaingroup.com/s/article/Recommended-router-settings-for-the-MyQ-Wi-Fi-products-1484145723404
+- https://support.chamberlaingroup.com/s/article/When-to-Contact-Your-Internet-Service-Provider-ISP
+
+TCP 8883 is conventionally MQTT over TLS, so outbound 8883 traffic is our highest-priority capture target. Do **not** treat the port number alone as proof that a given connection speaks MQTT; confirm from current live traffic and/or firmware/app evidence.
+
+This also makes a useful identification experiment: once the opener IP is confirmed, an outbound connection from that host to TCP 8883 is strong supporting evidence that we have the right device. Blocking it is not required for discovery and should not be the first test.
+
 ## Phase B2.1 — identify the opener
 
 The Chamberlain Group currently has several IEEE OUI registrations commonly associated with its network devices. `tools/lan_probe.py` flags these as candidates:
@@ -24,7 +35,7 @@ Run from a machine on the same LAN:
 python tools\lan_probe.py --subnet 192.168.187.0/24
 ```
 
-The script performs a ping sweep, reads the local ARP cache, marks Chamberlain-prefix MACs, resolves hostnames when possible and probes common HTTP/MQTT/TLS ports.
+The script probes the subnet to populate the neighbor cache, reads ARP, marks Chamberlain-prefix MACs, resolves hostnames when possible and probes common HTTP/MQTT/TLS ports. **ARP-observed devices are retained even when they ignore ICMP ping**, because IoT devices are often ping-silent.
 
 **Important:** no listening TCP ports does not rule out a myQ device. An opener can operate as an outbound-only TLS/MQTT client.
 
@@ -68,7 +79,7 @@ The first capture should be short and read-only:
 Capture at minimum:
 
 - DNS queries/answers;
-- destination IP/port;
+- destination IP/port, with special attention to TCP 8883;
 - TLS SNI/ALPN/certificate metadata;
 - connection timing/reconnect behavior;
 - MQTT CONNECT metadata only if visible outside TLS.

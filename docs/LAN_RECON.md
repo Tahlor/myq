@@ -61,6 +61,10 @@ A fresh scan saw the same `MyQ-*` hostname among the LAN neighbors. The targeted
 
 **Important:** no listening TCP ports does not rule out a myQ device. An opener can operate as an outbound-only TLS/MQTT client.
 
+## Superbox capture-tool check — 2026-09-05
+
+The rooted Superbox was checked as a possible short-term observation point. Its system `toybox` is present, but the image exposes no `tcpdump`, `tshark`, or `netcat` command. No capture binary was installed and no interception or traffic mutation was attempted. A router/AP capture, managed-switch mirror, or another already-approved observation point is still needed to classify the opener's outbound protocol.
+
 After a likely candidate is found, confirm it by temporarily disconnecting/reconnecting the opener from Wi-Fi or comparing the router's device list. Do not identify a device solely from a guessed hostname.
 
 ## Phase B2.2 — read-only local enumeration

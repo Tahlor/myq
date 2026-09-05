@@ -46,6 +46,8 @@ The HTTP lifecycle is now hosted by a separate foreground service, while the acc
 
 The bridge host now also registers a boot receiver so the foreground HTTP service can restart after a normal Android boot. A live reboot/persistence test remains pending because it would interrupt the shared Superbox and should be performed after authentication and read-only validation are complete.
 
+The installed service was rechecked while OAuth MFA remained in Chrome: `GET /health` returned `{"status":"ok"}`, while an invalid-key request to the protected `/status` endpoint returned `401` before touching the myQ UI. This confirms both liveness and the authentication gate without launching the app or sending a garage command.
+
 ## Authorized credential bootstrap — 2026-09-05
 
 The existing Pi3 Broadlink deployment was reachable through its configured SSH profile. Its expected `/home/pi/bashrc/secure/credentials_myq` file was present and had the two-line email/password shape used by the Broadlink controller. The values were copied in memory into ignored `config/myq_credentials.local.json` with `scripts/import_pi3_myq_credentials.ps1`, preserving the bridge API key. The temporary raw copy was removed immediately after import. Secret values were not printed, committed, or added to documentation.

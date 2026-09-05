@@ -44,6 +44,8 @@ The identity service presents separate SMS and email MFA choices plus a skip act
 
 The HTTP lifecycle is now hosted by a separate foreground service, while the accessibility service only supplies myQ UI roots and actions. This fixes the OAuth handoff failure where the old design stopped TCP 8765 when Chrome became foreground. After rebuilding and reinstalling, authenticated `/debug/nodes` returned six WelcomeActivity nodes, Chrome's custom-tab login opened, and both `/health` and TCP 8765 remained available during the handoff. No door command was issued.
 
+The bridge host now also registers a boot receiver so the foreground HTTP service can restart after a normal Android boot. A live reboot/persistence test remains pending because it would interrupt the shared Superbox and should be performed after authentication and read-only validation are complete.
+
 ## Authorized credential bootstrap — 2026-09-05
 
 The existing Pi3 Broadlink deployment was reachable through its configured SSH profile. Its expected `/home/pi/bashrc/secure/credentials_myq` file was present and had the two-line email/password shape used by the Broadlink controller. The values were copied in memory into ignored `config/myq_credentials.local.json` with `scripts/import_pi3_myq_credentials.ps1`, preserving the bridge API key. The temporary raw copy was removed immediately after import. Secret values were not printed, committed, or added to documentation.

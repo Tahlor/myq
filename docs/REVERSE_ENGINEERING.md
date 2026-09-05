@@ -56,6 +56,8 @@ The device route families are split across services in the APK, which matters wh
 - the shared `InterfaceC7621d` service is bound to `devices.myq-cloud.com` and exposes `GET /api/{apiVersion}/Accounts/{accountId}/Devices`, details, and transmitters, with enum values through `v6.0`;
 - the current v6 GDO service is bound to `account-devices-gdo.myq-cloud.com` and exposes the lower-case `accounts/.../door_openers/...` routes, including explicit `/open` and `/close`.
 
+The static call graph strengthens the device-list finding: the app's `C17353i` communication method invokes the shared service with `v6.0` for list/detail/rename operations, and its `C7426d` response model is an envelope containing `href`, `count`, and `items`. This is why the Android path is selected before the separately observed v6.2 route in the clean-room client.
+
 The clean-room client therefore prefers the APK-shaped `devices.myq-cloud.com/api/v6.0/Accounts/{id}/Devices` read for an Android-issued session and falls back to the separately observed `api/v6.2/.../Devices` route on a 404/405. iOS-shaped sessions retain the v6.2 route as their primary path. This is read-only route selection; no command endpoint is involved.
 
 The APK also contains TCP-8883 diagnostic text and App Check/Integrity feature flags. Their static presence is not evidence that every current request is enforced by attestation; that distinction still requires authenticated runtime observation. Raw APK/decompiler output remains local and ignored.

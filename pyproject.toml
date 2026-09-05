@@ -5,19 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tahlor-myq-bridge"
 version = "0.1.0"
-description = "Software-only myQ bridge using the official Android app"
+description = "Software-only myQ bridge using the official Android app or direct cloud session"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
+  "httpx>=0.27,<1",
   "uvicorn[standard]>=0.30,<1",
   "uiautomator2>=3.2,<4",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "httpx>=0.27,<1"]
+dev = ["pytest>=8,<9"]
 
 [project.scripts]
 myq-bridge = "myq_bridge.api:main"
+myq-cloud = "myq_bridge.cloud_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

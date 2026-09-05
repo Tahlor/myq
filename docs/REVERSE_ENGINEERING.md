@@ -52,6 +52,8 @@ The same APK's OAuth parameter enum uses client id `ANDROID_CGI_MYQ`, scope `MyQ
 
 The APK also contains TCP-8883 diagnostic text and App Check/Integrity feature flags. Their static presence is not evidence that every current request is enforced by attestation; that distinction still requires authenticated runtime observation. Raw APK/decompiler output remains local and ignored.
 
+The OAuth manager persists the access and refresh values in the app's encrypted `LiftmasterMyQPrefs.xml` preferences. The repository now includes `scripts/extract_myq_session.ps1`, which uses the already-authorized root path on the SuperBOX, decrypts those two values in memory using the APK's app-local storage configuration, and atomically writes only the direct-client session shape to ignored `config/cloud_session.json`. It never prints token contents. A live run before authentication correctly reports that both tokens are absent.
+
 ## Other references
 
 Historical clients proved the MyQ cloud API was sufficient for account login, device enumeration, state and door commands before Chamberlain's anti-automation changes:

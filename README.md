@@ -43,6 +43,16 @@ $env:MYQ_API_KEY = '<local-secret>'
 myq-cloud serve
 ```
 
+After authenticating the official app on the rooted SuperBOX, recover its rotating session without exposing it in the terminal:
+
+```powershell
+.\scripts\extract_myq_session.ps1 -AdbPath C:\path\to\adb.exe
+myq-cloud refresh
+myq-cloud accounts
+```
+
+The extractor writes only the ignored session file and reports presence/absence; it does not print access or refresh tokens.
+
 The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle.
 
 ## Official-app / Superbox bridge

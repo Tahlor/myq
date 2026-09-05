@@ -115,6 +115,62 @@ def test_device_and_explicit_action_paths_are_current_v6_shapes():
     ]
 
 
+def test_door_status_normalizes_only_garage_devices():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == ACCOUNTS_URL:
+            return httpx.Response(200, json={"accounts": [{"id": "acct"}]})
+        if str(request.url) == DEVICES_URL.format(account_id="acct"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "serial_number": "door-1",
+                            "account_id": "acct",
+                            "device_family": "garagedoor",
+                            "name": "Main Garage",
+                            "device_model": "wifigaragedooropener",
+                            "state": {
+                                "door_state": "closed",
+                                "online": True,
+                                "absolute_cycle_count": 123,
+                            },
+                        },
+                        {
+                            "serial_number": "light-1",
+                            "device_family": "lamp",
+                            "state": {"online": True},
+                        },
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        assert client.door_status() == [
+            {
+                "account_id": "acct",
+                "door_opener_id": "door-1",
+                "name": "Main Garage",
+                "model": "wifigaragedooropener",
+                "door_state": "closed",
+                "online": True,
+                "last_update": None,
+                "service_cycle_count": None,
+                "absolute_cycle_count": 123,
+                "battery_backup_voltage": None,
+                "battery_backup_state": None,
+                "attached_worklight_on": None,
+            }
+        ]
+    finally:
+        client.close()
+
+
 def test_session_store_accepts_legacy_jwt_key(tmp_path: Path):
     path = tmp_path / "session.json"
     path.write_text(

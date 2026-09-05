@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">myQ LAN Bridge</string>
-    <string name="accessibility_description">Exposes the owner&apos;s official myQ app to trusted home-automation clients on the local network.</string>
+    <string name="accessibility_description">Provides trusted local-network home automation access to the official myQ app.</string>
 </resources>

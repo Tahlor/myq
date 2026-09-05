@@ -4,19 +4,49 @@
 
 Use the official Android app as an oracle, then replace UI automation with our own clean client wherever the current protocol permits it.
 
-Historical clients proved the myQ cloud API was sufficient for account login, device enumeration, state and door commands. Chamberlain later blocked generic third-party clients. The question in 2026 is not whether an API exists—the official app necessarily has one—but what **current attestation/session material** the server requires.
+## Strong current evidence — August 2026
 
-Useful historical reference:
+A new public Home Assistant integration, `vector-sec/chamberlain-myq-hacs`, was created August 10, 2026 and implements direct MyQ control with:
+
+- an initial authorized JWT/access token plus refresh token;
+- standard OAuth `grant_type=refresh_token` rotation;
+- client id `IOS_CGI_MYQ`;
+- app version `5.315.0.66076` and matching iOS-style User-Agent;
+- `partner-identity.myq-cloud.com/connect/token` for refresh;
+- v6 account APIs and v6.2 device enumeration;
+- v6 door-opener `PUT .../{open|close}` commands;
+- no Play Integrity/App Check argument on the refresh or door-command request surface shown by that implementation.
+
+This is stronger than the old 2023 API evidence. We therefore clean-room implemented the current protocol facts in `src/myq_bridge/cloud.py` and `src/myq_bridge/cloud_cli.py`. Do not copy/vendor the external implementation; its repository currently has no license file.
+
+The remaining B1 gate is **initial authorized-session bootstrap**. Once an authorized access/refresh-token pair is available locally, our client can rotate it and persist the new pair atomically in ignored `config/cloud_session.json`.
+
+```powershell
+Copy-Item config\cloud_session.example.json config\cloud_session.json
+# Fill this local ignored file with an authorized session; never commit it.
+myq-cloud refresh
+myq-cloud accounts
+myq-cloud devices <account-id>
+
+$env:MYQ_API_KEY = '<local-secret>'
+myq-cloud serve   # default port 8766
+```
+
+The direct REST facade exposes explicit open/close operations only; it does not use a toggle.
+
+## Other references
+
+Historical clients proved the MyQ cloud API was sufficient for account login, device enumeration, state and door commands before Chamberlain's anti-automation changes:
 
 - https://github.com/hjdhjd/myq
-- package: `com.chamberlain.android.liftmaster.myq`
-- current Play listing (August 2026): https://play.google.com/store/apps/details?id=com.chamberlain.android.liftmaster.myq
+- official Android package: `com.chamberlain.android.liftmaster.myq`
+- current Play listing: https://play.google.com/store/apps/details?id=com.chamberlain.android.liftmaster.myq
 
-The historical v6 client also notes an apparent MQTT interface and Firebase notifications. Treat that only as a lead until current APK/live traffic confirms it.
+The historical v6 client also mentions an apparent MQTT interface and Firebase notifications. Treat that only as a lead until current APK/live traffic confirms which MQTT/WebSocket surfaces are app-facing versus opener-facing.
 
 ## Static workflow
 
-After installing a working myQ build on the Superbox:
+After installing a working MyQ build on the Superbox:
 
 ```powershell
 $dir = .\scripts\pull_myq_apks.ps1
@@ -36,8 +66,6 @@ $dir = .\scripts\pull_myq_apks.ps1
 Raw decompilation stays ignored. Commit only clean-room notes describing behavior/interfaces we need for interoperability.
 
 ### Highest-value classes/strings
-
-Search for these first:
 
 ```text
 IntegrityManager
@@ -66,51 +94,48 @@ Prefer observation before bypassing anything.
 1. Start the authenticated official app.
 2. Capture `logcat` while refreshing the door dashboard.
 3. Record DNS destinations from the Android host/network.
-4. If static analysis shows ordinary OkHttp/Retrofit and traffic details are still missing, attach Frida to log request metadata.
-5. Redact credentials/tokens from committed output.
-6. Reproduce **read-only** requests first (`account`, `devices`, `state`).
-7. Only after state reads work reliably, reproduce an explicit open/close request.
+4. If static analysis shows ordinary OkHttp/Retrofit and traffic details are still missing, attach Frida to log **non-secret request metadata**.
+5. Keep credentials/tokens out of committed output.
+6. Compare the Android app's client id/app-version/header shape with the working August 2026 iOS identity.
+7. Reproduce read-only `accounts` and `devices` calls first.
+8. Only after state reads work reliably, reproduce an explicit open/close request.
 
-The Superbox repository already contains Frida-server installation work. Reuse it rather than creating a second incompatible Frida deployment path.
+The Superbox repository already contains Frida-server installation work. Reuse it rather than creating a second incompatible deployment path.
 
-## Session-bootstrap hypothesis
+## Revised session-bootstrap hypothesis
 
-The June/August 2026 ReDroid reports suggest this useful possibility:
-
-1. authenticate once using pre-Integrity myQ `5.243.1.73243`;
-2. retain the resulting long-lived app session;
-3. inspect which session token(s) are sufficient for normal API operations;
-4. determine whether those tokens can be refreshed without a fresh hardware attestation;
-5. if yes, make our own daemon consume/refresh the session directly.
-
-If this works, the production bridge becomes:
+The direct refresh evidence changes the likely architecture:
 
 ```text
-Home automation -> our local REST/MQTT service -> myQ cloud
-                                        ^
-                         official app only for bootstrap/recovery
+                    one-time / recovery bootstrap
+official MyQ app  -----------------------------> authorized session
+                                                     |
+                                                     v
+Home automation -> our local REST service -> MyQ v6 cloud -> opener
 ```
 
-That is much less fragile than accessibility automation while still requiring no garage-side hardware.
+The leading hypotheses now are:
+
+1. **Integrity is login/bootstrap-only.** Best case: authenticate with a compatible official app, then use the rotating OAuth session indefinitely in our daemon.
+2. **Client identity matters at refresh.** Capture the actual Android client id/version metadata and make it configurable; do not assume an Android-issued refresh token is interchangeable with `IOS_CGI_MYQ`.
+3. **Old authenticated session can seed a newer client.** Test session persistence/upgrades on the Superbox after basic control is proven.
 
 ## Integrity decision tree
 
-Do not assume "Play Integrity" means the entire effort is blocked.
+- **Login-only attestation:** direct cloud becomes primary; official app is bootstrap/recovery.
+- **Refresh-time attestation:** current August 2026 direct-refresh evidence would need reconciliation with our account/token origin; keep app bridge available.
+- **Per-command attestation:** contradicted by the current direct integration unless its account/client context differs materially; verify live before assuming.
+- **Official partner/device flow becomes available:** prefer it over brittle app emulation.
 
-- **Only login attested:** bootstrap with the older app and reuse session.
-- **Refresh attested:** keep the official app as refresh oracle and export only short-lived credentials to the local daemon.
-- **Every command attested:** UI/app bridge remains the reliable path unless current attestation can legitimately be obtained on an Android device we control.
-- **Server accepts an official partner/device flow:** investigate that cleanly before patching the app.
-
-## Capturing sensitive material
+## Sensitive material
 
 Never commit:
 
 - usernames/passwords;
 - OAuth codes/verifiers;
-- bearer/refresh tokens;
+- bearer/access/refresh tokens;
 - Firebase installation/auth tokens;
 - Play Integrity verdict tokens;
 - garage/device serials if not required for public interoperability documentation.
 
-Store raw captures under ignored `captures/` and record only sanitized endpoint/method/schema findings in Git.
+Use ignored `config/cloud_session.json` and `captures/` for local evidence. Commit only sanitized endpoint/method/schema findings.

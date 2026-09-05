@@ -10,7 +10,19 @@ The same thread reports that myQ `5.243.1.73243` can authenticate without the ha
 
 ## Local baseline — 2026-09-04
 
-The canonical Superbox answered on its configured network-ADB endpoint and reported Android 12 with `armeabi-v7a`. Neither `com.chamberlain.android.liftmaster.myq` nor `com.tahlor.myqbridge` was installed, and TCP 8765 was not listening. No app installation, accessibility change, or garage operation was attempted during this baseline.
+The canonical Superbox answered on its configured network-ADB endpoint and reported Android 12 with `armeabi-v7a`. Before installation, neither `com.chamberlain.android.liftmaster.myq` nor `com.tahlor.myqbridge` was installed, and TCP 8765 was not listening. No accessibility change or garage operation was attempted during this baseline.
+
+## Live app install — 2026-09-04
+
+APKMirror's manually reviewed universal APK was downloaded through the existing Edge session and kept under ignored `captures/apk/` storage. The file size and SHA-256 matched the download page exactly:
+
+- version `5.243.1.73243`, package `com.chamberlain.android.liftmaster.myq`;
+- `118,474,022` bytes;
+- SHA-256 `252cfdff12dad8e57b10a5c8f066ca733b2885cd6ea1fd6515726cf7fe90fc55`;
+- installed successfully on the Superbox (`versionCode=73243`, APK signing scheme v2);
+- Android reported the Chamberlain certificate fingerprint `3C:49:83:4E:C2:79:0E:B4:72:33:08:04:01:A5:D3:7B:35:4B:D5:AC:63:9B:EE:AF:BB:EF:7C:56:20:05:E4:0C`.
+
+The app launched to `ConsentToTermsActivity`. Account authentication is intentionally waiting for the owner to accept the current Terms of Service and Privacy Policy on the Superbox. No credentials have been copied into the repository, terminal commands, logs, or screenshots.
 
 Our existing SuperBOX S7MAX is preferable to a new Android VM because it is already an always-on Android device on the LAN with remote ADB. This repo therefore has two implementations of the same bridge contract:
 
@@ -21,7 +33,7 @@ Both use the same `config/doors.json` selector schema.
 
 ## Phase A1 — install and authenticate official myQ
 
-1. Obtain myQ `5.243.1.73243` locally. Do not commit the APK.
+1. Obtain myQ `5.243.1.73243` locally. Do not commit the APK. This has been completed and verified as documented above.
 2. Connect:
 
    ```powershell
@@ -129,7 +141,7 @@ Then use Track B1 to recover the current cloud calls. If authenticated requests 
 
 ## Current live unknowns
 
-- Does `5.243.1.73243` install and run normally on the S7MAX's 32-bit ARM Android 12 build?
+- Does the owner-approved consent flow and login complete on the S7MAX's 32-bit ARM Android 12 build?
 - Does its login WebView work with the Superbox's current WebView, or does WebView need an update?
 - Does the app reject the Superbox's exposed `su` binary?
 - Which MyQ accessibility resource IDs are stable on the real dashboard?

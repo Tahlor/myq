@@ -34,7 +34,11 @@ The generated bridge API key and the owner-authorized account credentials are st
 
 ## Live login handoff — 2026-09-05
 
-The native bridge was revalidated after the APK and bridge installs: `/health` returned `ok`, authenticated `/debug/nodes` returned six nodes, and the foreground activity was `WelcomeActivity`. The bridge then opened the app's Login button, which launched Chrome's custom-tab OAuth flow for the current myQ identity service. No username, password, OAuth code, access token, refresh token, or garage command was entered or emitted. The Superbox is currently positioned at the login handoff and is ready for the owner-authorized credential step.
+The native bridge was revalidated after the APK and bridge installs: `/health` returned `ok`, authenticated `/debug/nodes` returned six nodes, and the foreground activity was `WelcomeActivity`. The bridge then opened the app's Login button, which launched Chrome's custom-tab OAuth flow for the current myQ identity service. The owner-authorized credentials were entered without logging their values, and the flow advanced to the MFA choice screen. No OAuth code, access token, refresh token, or garage command was entered or emitted.
+
+## Live MFA checkpoint — 2026-09-05
+
+The identity service presents separate SMS and email MFA choices plus a skip action. The screen was intentionally left unchanged: choosing a delivery channel sends a one-time code or changes the account's MFA flow, so the owner must choose the preferred channel and enter the code on the Superbox. The code should not be sent through chat or committed to the repository.
 
 ## Authorized credential bootstrap — 2026-09-05
 

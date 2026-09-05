@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 import myq_bridge.cloud_cli as cloud_cli
@@ -15,6 +16,7 @@ from myq_bridge.cloud import (
     DEVICES_URL,
     DOOR_ACTION_URL,
     CloudSession,
+    MyQAuthError,
     MyQCloudClient,
     SessionStore,
 )
@@ -98,6 +100,33 @@ def test_401_refreshes_then_retries_account_request():
     finally:
         client.close()
     assert account_calls == 2
+
+
+def test_mutation_401_is_not_replayed_after_refresh():
+    calls: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, str(request.url)))
+        if request.method == "PUT":
+            return httpx.Response(401)
+        raise AssertionError("A mutating 401 must not trigger token refresh")
+
+    client = MyQCloudClient(
+        CloudSession("expired", "refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        with pytest.raises(MyQAuthError, match="automatic replay was refused"):
+            client.door_action("acct", "door", "close")
+    finally:
+        client.close()
+
+    assert calls == [
+        (
+            "PUT",
+            DOOR_ACTION_URL.format(account_id="acct", door_opener_id="door", action="close"),
+        )
+    ]
 
 
 def test_device_and_explicit_action_paths_are_current_v6_shapes():

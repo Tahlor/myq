@@ -36,6 +36,8 @@ myq-cloud serve   # default port 8766
 
 The direct REST facade exposes explicit open/close operations only; it does not use a toggle. Read-only status is available globally at `GET /status` and for a single account at `GET /accounts/{account_id}/status`.
 
+The clean-room client refreshes and retries an expired session for read-only HTTP requests. It deliberately does **not** replay a mutating `open`, `close`, or lock-mode request after a `401`; the caller must re-authenticate and make a fresh, explicit request after verifying state.
+
 ## Current APK static cross-check — 5.243.1.73243
 
 The verified APK installed on the SuperBOX is version `5.243.1.73243`. A local decompilation of that exact APK independently confirms the current cloud route families and production hosts:

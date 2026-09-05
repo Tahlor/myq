@@ -212,13 +212,26 @@ class MyQCloudClient:
             self.on_session_updated(self.session)
         return self.session
 
-    def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+    def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        retry_on_unauthorized: bool | None = None,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        # A read can be safely replayed after a token refresh. Do not replay
+        # a mutation automatically: a 401 can be returned after a server or
+        # intermediary has already accepted the request, and repeating an
+        # open/close/lock operation would be unsafe.
+        if retry_on_unauthorized is None:
+            retry_on_unauthorized = method.upper() in {"GET", "HEAD", "OPTIONS"}
         response = self._client.request(method, url, headers=self.headers, **kwargs)
-        if response.status_code == 401:
+        if response.status_code == 401 and retry_on_unauthorized:
             self.refresh()
             response = self._client.request(method, url, headers=self.headers, **kwargs)
         if response.status_code == 401:
-            raise MyQAuthError("MyQ request remained unauthorized after refresh")
+            raise MyQAuthError("MyQ request was unauthorized; automatic replay was refused")
         return response
 
     def accounts(self) -> list[dict[str, Any]]:
@@ -292,6 +305,7 @@ class MyQCloudClient:
                 door_opener_id=door_opener_id,
                 action=action,
             ),
+            retry_on_unauthorized=False,
             content=b"",
         )
         if response.status_code not in (200, 202):
@@ -306,6 +320,7 @@ class MyQCloudClient:
                 account_id=account_id,
                 door_opener_id=door_opener_id,
             ),
+            retry_on_unauthorized=False,
             json={"enable_lock_mode": bool(enabled)},
         )
         if response.status_code not in (200, 202):

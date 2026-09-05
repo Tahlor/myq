@@ -27,6 +27,7 @@ class Host:
     mac: str | None
     hostname: str | None
     chamberlain_oui: bool
+    responds_to_ping: bool
     open_ports: list[int]
 
 
@@ -79,23 +80,57 @@ def is_chamberlain(mac: str | None) -> bool:
     return any(normalized.startswith(prefix) for prefix in CHAMBERLAIN_OUIS)
 
 
+def observed_hosts(
+    network: ipaddress.IPv4Network,
+    ping_results: dict[str, bool],
+    arp: dict[str, str],
+) -> list[str]:
+    """Return hosts observed by ICMP or ARP, restricted to the requested subnet.
+
+    A garage opener may deliberately ignore ICMP while still answering ARP. The
+    ping sweep is useful because it also causes the OS to resolve neighbor MACs,
+    so the post-sweep ARP table is independent evidence of a live L2 neighbor.
+    """
+    observed = {ip for ip, ok in ping_results.items() if ok}
+    for ip in arp:
+        try:
+            address = ipaddress.ip_address(ip)
+        except ValueError:
+            continue
+        if address in network:
+            observed.add(ip)
+    return sorted(observed, key=ipaddress.ip_address)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Discover likely myQ devices on a local IPv4 subnet")
     parser.add_argument("--subnet", default="192.168.187.0/24")
     parser.add_argument("--ports", default=",".join(map(str, DEFAULT_PORTS)))
-    parser.add_argument("--scan-all-ports", action="store_true", help="Probe ports on every responding host, not just Chamberlain OUI matches")
+    parser.add_argument(
+        "--scan-all-ports",
+        action="store_true",
+        help="Probe ports on every ICMP/ARP-observed host, not just Chamberlain OUI matches",
+    )
     parser.add_argument("--output", default="captures/lan/latest.json")
     args = parser.parse_args()
 
     network = ipaddress.ip_network(args.subnet, strict=False)
+    if not isinstance(network, ipaddress.IPv4Network):
+        raise SystemExit("Only IPv4 subnets are supported")
+
     ips = [str(ip) for ip in network.hosts()]
     with concurrent.futures.ThreadPoolExecutor(max_workers=64) as pool:
-        live = [ip for ip, ok in zip(ips, pool.map(ping, ips)) if ok]
+        ping_ok = list(pool.map(ping, ips))
+    ping_results = dict(zip(ips, ping_ok))
 
+    # Read ARP *after* probing the subnet: even devices that drop ICMP can leave
+    # a neighbor-cache entry because the host had to ARP before sending ping.
     arp = arp_table()
+    observed = observed_hosts(network, ping_results, arp)
+
     ports = [int(value) for value in args.ports.split(",") if value.strip()]
     hosts: list[Host] = []
-    for ip in live:
+    for ip in observed:
         mac = arp.get(ip)
         candidate = is_chamberlain(mac)
         opened: list[int] = []
@@ -103,7 +138,16 @@ def main() -> int:
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(16, len(ports) or 1)) as pool:
                 checks = list(pool.map(lambda p: port_open(ip, p), ports))
             opened = [port for port, ok in zip(ports, checks) if ok]
-        hosts.append(Host(ip, mac, reverse_name(ip), candidate, opened))
+        hosts.append(
+            Host(
+                ip=ip,
+                mac=mac,
+                hostname=reverse_name(ip),
+                chamberlain_oui=candidate,
+                responds_to_ping=ping_results.get(ip, False),
+                open_ports=opened,
+            )
+        )
 
     candidates = [asdict(host) for host in hosts if host.chamberlain_oui]
     report = {
@@ -111,8 +155,11 @@ def main() -> int:
         "known_chamberlain_ouis": sorted(CHAMBERLAIN_OUIS),
         "candidate_count": len(candidates),
         "candidates": candidates,
-        "live_hosts": [asdict(host) for host in hosts],
-        "note": "No listening ports does not rule out myQ; openers may be outbound-only cloud clients.",
+        "observed_hosts": [asdict(host) for host in hosts],
+        "note": (
+            "Hosts are retained when seen by ICMP or ARP; a silent ping does not exclude myQ. "
+            "No listening ports also does not rule out myQ because openers may be outbound-only cloud clients."
+        ),
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

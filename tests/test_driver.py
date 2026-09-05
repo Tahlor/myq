@@ -1,3 +1,8 @@
+from types import SimpleNamespace
+
+import pytest
+
+from myq_bridge.config import DoorConfig, Selector
 from myq_bridge.driver import MyQDriver
 
 
@@ -22,3 +27,31 @@ def test_visible_nodes_and_state_tokens():
         "com.myq:id/action",
     ]
     assert MyQDriver.infer_state_tokens(xml) == ["closed"]
+
+
+def test_explicit_command_refuses_toggle_when_state_is_unknown():
+    door = DoorConfig(
+        name="Garage Door",
+        state=Selector(resource_id="state"),
+        toggle=Selector(resource_id="toggle"),
+    )
+
+    class FakeDriver(MyQDriver):
+        def __init__(self):
+            self.settings = SimpleNamespace(doors=(door,))
+            self._lock = __import__("threading").RLock()
+            self.clicked = False
+
+        def launch(self):
+            pass
+
+        def get_state(self, _door):
+            return "unknown"
+
+        def _click(self, _selector):
+            self.clicked = True
+
+    driver = FakeDriver()
+    with pytest.raises(RuntimeError, match="Refusing blind toggle"):
+        driver.command("Garage Door", "open")
+    assert driver.clicked is False

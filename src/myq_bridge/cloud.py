@@ -68,11 +68,7 @@ class CloudSession:
 
 
 class SessionStore:
-    """Small local credential store for rotating MyQ OAuth tokens.
-
-    The file path is expected to live under ignored `config/` or another private
-    location. Writes are atomic and best-effort chmod 0600 on POSIX.
-    """
+    """Small local credential store for rotating MyQ OAuth tokens."""
 
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -128,11 +124,11 @@ def load_cloud_session(store: SessionStore | None = None) -> CloudSession:
 
 
 class MyQCloudClient:
-    """Direct client for the current MyQ v6 cloud surface.
+    """Direct client for the MyQ v6 surface observed in August 2026.
 
-    Authentication bootstrap is intentionally out of scope here: this client
-    consumes an already-authorized app session, refreshes it normally, and uses
-    the same account/device/action endpoints as current first-party clients.
+    Authentication bootstrap is intentionally separate: this client consumes an
+    already-authorized session, refreshes it through the normal OAuth grant, and
+    performs account/device/door operations.
     """
 
     def __init__(
@@ -217,6 +213,40 @@ class MyQCloudClient:
         payload = response.json()
         return list(payload.get("items") or [])
 
+    def door_status(self) -> list[dict[str, Any]]:
+        """Return a compact automation-friendly summary of every garage door."""
+        doors: list[dict[str, Any]] = []
+        for account in self.accounts():
+            account_id = str(account.get("id") or "")
+            if not account_id:
+                continue
+            for device in self.devices(account_id):
+                state = device.get("state") or {}
+                if not isinstance(state, dict):
+                    state = {}
+                if device.get("device_family") != "garagedoor" and "door_state" not in state:
+                    continue
+                opener_id = str(device.get("serial_number") or device.get("id") or "")
+                if not opener_id:
+                    continue
+                doors.append(
+                    {
+                        "account_id": str(device.get("account_id") or account_id),
+                        "door_opener_id": opener_id,
+                        "name": device.get("name") or "Garage Door",
+                        "model": device.get("device_model"),
+                        "door_state": state.get("door_state"),
+                        "online": state.get("online"),
+                        "last_update": state.get("last_update"),
+                        "service_cycle_count": state.get("service_cycle_count"),
+                        "absolute_cycle_count": state.get("absolute_cycle_count"),
+                        "battery_backup_voltage": state.get("battery_backup_voltage"),
+                        "battery_backup_state": state.get("battery_backup_state"),
+                        "attached_worklight_on": state.get("attached_worklight_on"),
+                    }
+                )
+        return doors
+
     def door_action(self, account_id: str, door_opener_id: str, action: str) -> None:
         if action not in {"open", "close"}:
             raise ValueError("action must be 'open' or 'close'")
@@ -251,6 +281,4 @@ class MyQCloudClient:
         if response.is_success:
             return
         body = response.text[:500]
-        raise MyQCloudError(
-            f"MyQ {operation} failed ({response.status_code}): {body}"
-        )
+        raise MyQCloudError(f"MyQ {operation} failed ({response.status_code}): {body}")

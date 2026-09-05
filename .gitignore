@@ -6,6 +6,10 @@ config/cloud_session.json
 captures/
 artifacts/
 
+# Android build output
+android_bridge/.gradle/
+android_bridge/**/build/
+
 # APK / reverse-engineering outputs
 *.apk
 *.apkm

@@ -24,6 +24,14 @@ APKMirror's manually reviewed universal APK was downloaded through the existing 
 
 The app launched to `ConsentToTermsActivity`. Account authentication is intentionally waiting for the owner to accept the current Terms of Service and Privacy Policy on the Superbox. No credentials have been copied into the repository, terminal commands, logs, or screenshots.
 
+## Live native bridge install — 2026-09-05
+
+The bridge was built locally with JDK 17, Gradle 8.9, Android platform 35, and build-tools 35.0.0, then installed as `com.tahlor.myqbridge`. Its accessibility service was appended to the existing enabled-service list without removing the Superbox's existing service. `GET /health` returned `{"status":"ok"}` and authenticated `GET /debug/nodes` successfully inspected the myQ welcome screen, including the stable sign-in resource ID `com.chamberlain.android.liftmaster.myq:id/welcome_btn_sign_in`.
+
+The first authenticated probe exposed an Android 11+ package-visibility issue: `getLaunchIntentForPackage()` could not see the installed myQ package. The bridge manifest now declares a package query for `com.chamberlain.android.liftmaster.myq`; after rebuilding and reinstalling, the read-only probe reached `WelcomeActivity` normally. No door configuration is installed yet, and no status or command endpoint has been used against a physical door.
+
+The generated bridge API key is stored locally in ignored `config/myq_credentials.local.json`. Account credentials remain pending a Bitwarden vault unlock; neither has been committed.
+
 Our existing SuperBOX S7MAX is preferable to a new Android VM because it is already an always-on Android device on the LAN with remote ADB. This repo therefore has two implementations of the same bridge contract:
 
 1. `android_bridge/` — **preferred steady-state path**. Accessibility service + authenticated HTTP API run directly on the Superbox; no PC is required after setup.

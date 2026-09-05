@@ -120,4 +120,6 @@ A garage door is a physical access-control device. The project:
 - refuses a UI toggle when current state is unknown;
 - keeps credentials, rotating OAuth tokens, APKs, screenshots/UI dumps, pcaps and raw captures out of Git.
 
+For the one-time official-app bootstrap, use `config/myq_credentials.example.json` as the shape for the ignored `config/myq_credentials.local.json` (or let the Bitwarden import workflow create/update it). Preserve the existing local `bridge_api_key` when adding the account fields. The local file is only a working copy for this checkout; its email and password are never printed, committed, or sent to a third party by the repository scripts.
+
 See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`, and issues #1–#3 for live evidence gates.

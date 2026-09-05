@@ -60,6 +60,9 @@ $document = [System.Xml.XmlDocument]::new()
 $document.LoadXml($xmlText)
 $values = @{}
 foreach ($node in $document.DocumentElement.ChildNodes) {
+    if ($node.NodeType -ne [System.Xml.XmlNodeType]::Element) {
+        continue
+    }
     $name = $node.GetAttribute("name")
     if (-not $name) {
         continue

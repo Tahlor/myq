@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 
 import myq_bridge.cloud_cli as cloud_cli
 from myq_bridge.cloud import (
+    ANDROID_CLIENT_ID,
+    ANDROID_DEVICES_URL,
     ACCOUNTS_URL,
     AUTH_URL,
     DEVICES_URL,
@@ -132,6 +134,55 @@ def test_device_and_explicit_action_paths_are_current_v6_shapes():
                 account_id="acct", door_opener_id="door", action="close"
             ),
         ),
+    ]
+
+
+def test_android_session_prefers_the_apk_device_route_and_headers():
+    seen: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url)))
+        assert request.headers["myqapplicationid"]
+        assert request.headers["culture"] == "en"
+        assert request.headers["brandid"] == "1"
+        assert request.headers["apiversion"] == "4.1"
+        return httpx.Response(200, json={"items": [{"device_family": "garagedoor"}]})
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh", client_id=ANDROID_CLIENT_ID),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        assert client.devices("acct") == [{"device_family": "garagedoor"}]
+    finally:
+        client.close()
+
+    assert seen == [
+        ("GET", ANDROID_DEVICES_URL.format(account_id="acct")),
+    ]
+
+
+def test_android_device_route_falls_back_to_direct_v6_2_route():
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        if str(request.url) == ANDROID_DEVICES_URL.format(account_id="acct"):
+            return httpx.Response(404)
+        return httpx.Response(200, json={"items": [{"device_family": "garagedoor"}]})
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh", client_id=ANDROID_CLIENT_ID),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        assert client.devices("acct") == [{"device_family": "garagedoor"}]
+    finally:
+        client.close()
+
+    assert seen == [
+        ANDROID_DEVICES_URL.format(account_id="acct"),
+        DEVICES_URL.format(account_id="acct"),
     ]
 
 

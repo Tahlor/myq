@@ -50,6 +50,14 @@ The verified APK installed on the SuperBOX is version `5.243.1.73243`. A local d
 
 The same APK's OAuth parameter enum uses client id `ANDROID_CGI_MYQ`, scope `MyQ_Residential offline_access`, redirect URI `com.myqops://android`, and PKCE `S256`; refresh-token grants are implemented alongside authorization-code grants. This is a concrete reason to keep the clean-room client's client id and app identity configurable: the existing direct-refresh evidence came from a different iOS-style client identity and is not proof that the two refresh-token contexts are interchangeable.
 
+The device route families are split across services in the APK, which matters when comparing Android runtime traffic with the newer direct client:
+
+- the legacy `InterfaceC7637e` service uses `api.myqdevice.com/api/v5/Accounts/{accountId}/Devices` for gateway registration/removal and `api/v5.1/...` provider-token/name operations;
+- the shared `InterfaceC7621d` service is bound to `devices.myq-cloud.com` and exposes `GET /api/{apiVersion}/Accounts/{accountId}/Devices`, details, and transmitters, with enum values through `v6.0`;
+- the current v6 GDO service is bound to `account-devices-gdo.myq-cloud.com` and exposes the lower-case `accounts/.../door_openers/...` routes, including explicit `/open` and `/close`.
+
+The clean-room client therefore prefers the APK-shaped `devices.myq-cloud.com/api/v6.0/Accounts/{id}/Devices` read for an Android-issued session and falls back to the separately observed `api/v6.2/.../Devices` route on a 404/405. iOS-shaped sessions retain the v6.2 route as their primary path. This is read-only route selection; no command endpoint is involved.
+
 The APK also contains TCP-8883 diagnostic text and App Check/Integrity feature flags. Their static presence is not evidence that every current request is enforced by attestation; that distinction still requires authenticated runtime observation. Raw APK/decompiler output remains local and ignored.
 
 The OAuth manager persists the access and refresh values in the app's encrypted `LiftmasterMyQPrefs.xml` preferences. The repository now includes `scripts/extract_myq_session.ps1`, which uses the already-authorized root path on the SuperBOX, decrypts those two values in memory using the APK's app-local storage configuration, and atomically writes only the direct-client session shape to ignored `config/cloud_session.json`. It never prints token contents. A live run before authentication correctly reports that both tokens are absent.

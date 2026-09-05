@@ -12,21 +12,20 @@ import java.io.File
 
 class BridgeAccessibilityService : AccessibilityService() {
     private val commandLock = Any()
-    private var server: BridgeHttpServer? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        server?.stop()
-        server = BridgeHttpServer(this).also { it.start() }
+        BridgeRuntime.attach(this)
     }
 
+    // The foreground host service owns the HTTP lifecycle; this component only
+    // receives events and roots for the official myQ package.
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
 
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
-        server?.stop()
-        server = null
+        BridgeRuntime.detach(this)
         super.onDestroy()
     }
 

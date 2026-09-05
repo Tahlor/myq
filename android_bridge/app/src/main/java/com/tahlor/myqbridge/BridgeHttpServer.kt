@@ -14,7 +14,17 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 
-class BridgeHttpServer(private val service: BridgeAccessibilityService) {
+interface BridgeRequestTarget {
+    fun status(): JSONObject
+    fun debugNodes(): JSONObject
+    fun command(doorName: String, action: String): JSONObject
+}
+
+
+class BridgeHttpServer(
+    private val context: Context,
+    private val target: BridgeRequestTarget,
+) {
     @Volatile private var running = false
     private var serverSocket: ServerSocket? = null
     private val clients = Executors.newCachedThreadPool()
@@ -92,9 +102,9 @@ class BridgeHttpServer(private val service: BridgeAccessibilityService) {
 
                 when {
                     method == "GET" && path == "/status" ->
-                        respond(client, 200, service.status())
+                        respond(client, 200, target.status())
                     method == "GET" && path == "/debug/nodes" ->
-                        respond(client, 200, service.debugNodes())
+                        respond(client, 200, target.debugNodes())
                     method == "POST" && path.startsWith("/doors/") ->
                         handleDoorCommand(client, path)
                     else -> respond(client, 404, errorJson("Not found"))
@@ -118,7 +128,7 @@ class BridgeHttpServer(private val service: BridgeAccessibilityService) {
             return
         }
         try {
-            respond(client, 200, service.command(doorName, action))
+            respond(client, 200, target.command(doorName, action))
         } catch (e: NoSuchElementException) {
             respond(client, 404, errorJson(e.message ?: "Unknown door"))
         } catch (e: IllegalArgumentException) {
@@ -129,7 +139,7 @@ class BridgeHttpServer(private val service: BridgeAccessibilityService) {
     }
 
     private fun authorized(provided: String?): Boolean {
-        val prefs = service.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val expected = prefs.getString(API_KEY, "").orEmpty()
         if (expected.length < 16 || provided.isNullOrEmpty()) return false
         return MessageDigest.isEqual(

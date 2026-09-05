@@ -40,6 +40,10 @@ The native bridge was revalidated after the APK and bridge installs: `/health` r
 
 The identity service presents separate SMS and email MFA choices plus a skip action. The screen was intentionally left unchanged: choosing a delivery channel sends a one-time code or changes the account's MFA flow, so the owner must choose the preferred channel and enter the code on the Superbox. The code should not be sent through chat or committed to the repository.
 
+## Live bridge lifecycle validation — 2026-09-05
+
+The HTTP lifecycle is now hosted by a separate foreground service, while the accessibility service only supplies myQ UI roots and actions. This fixes the OAuth handoff failure where the old design stopped TCP 8765 when Chrome became foreground. After rebuilding and reinstalling, authenticated `/debug/nodes` returned six WelcomeActivity nodes, Chrome's custom-tab login opened, and both `/health` and TCP 8765 remained available during the handoff. No door command was issued.
+
 ## Authorized credential bootstrap — 2026-09-05
 
 The existing Pi3 Broadlink deployment was reachable through its configured SSH profile. Its expected `/home/pi/bashrc/secure/credentials_myq` file was present and had the two-line email/password shape used by the Broadlink controller. The values were copied in memory into ignored `config/myq_credentials.local.json` with `scripts/import_pi3_myq_credentials.ps1`, preserving the bridge API key. The temporary raw copy was removed immediately after import. Secret values were not printed, committed, or added to documentation.
@@ -90,7 +94,7 @@ The installer:
 - optionally pushes an already-calibrated `doors.json`;
 - prints the Superbox LAN API endpoint and secret.
 
-The accessibility service is package-scoped to `com.chamberlain.android.liftmaster.myq`. It is not a generic remote UI-control service.
+The foreground host service keeps the HTTP port available while myQ hands off to Chrome for OAuth. The accessibility component remains package-scoped to `com.chamberlain.android.liftmaster.myq`, and it only reads or acts on that package's root. It is not a generic remote UI-control service.
 
 If automatic accessibility enablement is undesirable for a test, pass `-NoEnableAccessibility` and enable **myQ LAN Bridge** manually in Android Accessibility settings.
 

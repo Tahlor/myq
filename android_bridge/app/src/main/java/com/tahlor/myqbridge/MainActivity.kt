@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Build
 import android.provider.Settings
 import android.util.Base64
 import android.view.Gravity
@@ -28,6 +29,7 @@ class MainActivity : Activity() {
             apiKey = generateKey()
             prefs.edit().putString(BridgeHttpServer.API_KEY, apiKey).apply()
         }
+        startBridgeHost()
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -41,7 +43,7 @@ class MainActivity : Activity() {
         })
         container.addView(TextView(this).apply {
             text = buildString {
-                append("The bridge listens on TCP ${BridgeHttpServer.PORT} only while its accessibility service is enabled.\n\n")
+                append("The bridge listens on TCP ${BridgeHttpServer.PORT} from a local foreground service. UI reads and commands require the accessibility service.\n\n")
                 append("API key configured: …${apiKey.takeLast(6)}\n")
                 append("Door selectors: Android/data/com.tahlor.myqbridge/files/doors.json\n\n")
                 append("Enable the accessibility service, then open myQ and verify the dashboard before sending commands.")
@@ -60,6 +62,15 @@ class MainActivity : Activity() {
             }
         })
         setContentView(container)
+    }
+
+    private fun startBridgeHost() {
+        val intent = Intent(this, BridgeHostService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
     }
 
     private fun generateKey(): String {

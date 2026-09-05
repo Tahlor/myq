@@ -65,8 +65,12 @@ def main() -> int:
                     sni[name.strip().lower()] += 1
         if src and dst:
             if args.opener_ip:
-                remote = dst if src == args.opener_ip else src
-                remote_port = tcp_dst or udp_dst if src == args.opener_ip else tcp_src or udp_src
+                if src == args.opener_ip:
+                    remote = dst
+                    remote_port = tcp_dst or udp_dst
+                else:
+                    remote = src
+                    remote_port = tcp_src or udp_src
                 if remote and remote_port:
                     endpoints[f"{remote}:{remote_port}"] += 1
             else:

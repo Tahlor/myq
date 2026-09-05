@@ -44,11 +44,17 @@ if (-not $NoEnableAccessibility) {
     $current = (& adb -s $AdbSerial shell settings get secure enabled_accessibility_services).Trim()
     if ($current -eq "null") { $current = "" }
     $services = @($current -split ':' | Where-Object { $_ })
-    if ($services -notcontains $ServiceComponent) {
-        $services += $ServiceComponent
-        $newValue = $services -join ':'
-        & adb -s $AdbSerial shell settings put secure enabled_accessibility_services $newValue
+    if ($services -contains $ServiceComponent) {
+        # Reinstalling the package can leave the component listed but unbound.
+        # Remove and re-add it so Android's accessibility manager performs a fresh bind.
+        $withoutBridge = @($services | Where-Object { $_ -ne $ServiceComponent })
+        & adb -s $AdbSerial shell settings put secure enabled_accessibility_services ($withoutBridge -join ':')
+        Start-Sleep -Milliseconds 500
+        $services = $withoutBridge
     }
+    $services += $ServiceComponent
+    $newValue = $services -join ':'
+    & adb -s $AdbSerial shell settings put secure enabled_accessibility_services $newValue
     & adb -s $AdbSerial shell settings put secure accessibility_enabled 1
 }
 

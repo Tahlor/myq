@@ -1,0 +1,28 @@
+# Local secrets / runtime
+.env
+*.local.json
+config/doors.json
+captures/
+artifacts/
+
+# APK / reverse-engineering outputs
+*.apk
+*.apkm
+*.xapk
+jadx-output/
+apktool-output/
+*.pcap
+*.pcapng
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

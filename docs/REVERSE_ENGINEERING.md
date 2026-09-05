@@ -21,6 +21,8 @@ This is stronger than the old 2023 API evidence. We therefore clean-room impleme
 
 The remaining B1 gate is **initial authorized-session bootstrap**. Once an authorized access/refresh-token pair is available locally, our client can rotate it and persist the new pair atomically in ignored `config/cloud_session.json`.
 
+As of 2026-09-04, this checkout has no local session file and no token environment variables, so live refresh/account validation is intentionally blocked pending an authorized bootstrap pair. No token material was requested or recorded by the agent.
+
 ```powershell
 Copy-Item config\cloud_session.example.json config\cloud_session.json
 # Fill this local ignored file with an authorized session; never commit it.
@@ -32,7 +34,7 @@ $env:MYQ_API_KEY = '<local-secret>'
 myq-cloud serve   # default port 8766
 ```
 
-The direct REST facade exposes explicit open/close operations only; it does not use a toggle.
+The direct REST facade exposes explicit open/close operations only; it does not use a toggle. Read-only status is available globally at `GET /status` and for a single account at `GET /accounts/{account_id}/status`.
 
 ## Other references
 

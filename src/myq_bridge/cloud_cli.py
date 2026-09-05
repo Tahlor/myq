@@ -65,6 +65,14 @@ def create_app(api_key: str) -> FastAPI:
     def status() -> dict[str, Any]:
         return {"backend": "direct-cloud", "doors": translate(client.door_status)}
 
+    @app.get("/accounts/{account_id}/status", dependencies=[protected])
+    def account_status(account_id: str) -> dict[str, Any]:
+        return {
+            "backend": "direct-cloud",
+            "account_id": account_id,
+            "doors": translate(lambda: client.door_status(account_id)),
+        }
+
     @app.get("/accounts", dependencies=[protected])
     def accounts() -> list[dict[str, Any]]:
         return translate(client.accounts)

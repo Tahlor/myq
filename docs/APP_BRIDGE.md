@@ -8,6 +8,10 @@ Reference: https://www.reddit.com/r/myq/comments/1u1oqvn/
 
 The same thread reports that myQ `5.243.1.73243` can authenticate without the hardware-backed Play Integrity requirement introduced in later builds, and another user confirmed the overall approach still worked in late August 2026.
 
+## Local baseline — 2026-09-04
+
+The canonical Superbox answered on its configured network-ADB endpoint and reported Android 12 with `armeabi-v7a`. Neither `com.chamberlain.android.liftmaster.myq` nor `com.tahlor.myqbridge` was installed, and TCP 8765 was not listening. No app installation, accessibility change, or garage operation was attempted during this baseline.
+
 Our existing SuperBOX S7MAX is preferable to a new Android VM because it is already an always-on Android device on the LAN with remote ADB. This repo therefore has two implementations of the same bridge contract:
 
 1. `android_bridge/` — **preferred steady-state path**. Accessibility service + authenticated HTTP API run directly on the Superbox; no PC is required after setup.

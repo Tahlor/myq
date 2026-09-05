@@ -37,6 +37,24 @@ python tools\lan_probe.py --subnet 192.168.187.0/24
 
 The script probes the subnet to populate the neighbor cache, reads ARP, marks Chamberlain-prefix MACs, resolves hostnames when possible and probes common HTTP/MQTT/TLS ports. **ARP-observed devices are retained even when they ignore ICMP ping**, because IoT devices are often ping-silent.
 
+Reverse-DNS lookups are bounded so stale neighbors cannot hold the scan open indefinitely. Adjust the per-address limit with `--reverse-dns-timeout` when diagnosing a resolver-specific problem.
+
+## Local read-only evidence — 2026-09-04
+
+The current host was scanned on the private `192.168.187.0/24` LAN. The probe saw 41 neighbors and no MACs matching the OUI list above. One neighbor had a local hostname matching the owner's `MyQ-*` naming convention, making it a **probable** opener but not a confirmed identification.
+
+Targeted read-only checks against that probable device found:
+
+- TCP 80 open; TCP 443, 1883, 8080, 8443 and 8883 closed or unreachable;
+- `GET /` returned `200` with a `Wi-Fi Setup` page;
+- `GET /start.html` returned `404`;
+- `GET /config.html`, `/config_hub.html`, and `/connect_hub.html` returned `200`;
+- `HEAD /` and `OPTIONS /` returned `404`;
+- the setup JavaScript referenced `/jconfig_save`, `/jscan_results`, and `/jconnect_serial`; no mutating endpoint was called;
+- `GET /jscan_results` returned `404`.
+
+This proves a local HTTP setup surface exists on the probable device, but not local door status or control. The device identity still needs confirmation from the router/AP client list, a normal supported Wi-Fi disconnect/reconnect observation, or scoped outbound capture. The exact IP, MAC and raw responses remain in ignored local captures only.
+
 **Important:** no listening TCP ports does not rule out a myQ device. An opener can operate as an outbound-only TLS/MQTT client.
 
 After a likely candidate is found, confirm it by temporarily disconnecting/reconnecting the opener from Wi-Fi or comparing the router's device list. Do not identify a device solely from a guessed hostname.

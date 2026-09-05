@@ -8,6 +8,7 @@ import platform
 import re
 import socket
 import subprocess
+import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -19,6 +20,7 @@ CHAMBERLAIN_OUIS = {
     "00:15:25",  # legacy Chamberlain Access Solutions registration
 }
 DEFAULT_PORTS = (22, 53, 80, 443, 554, 1883, 8080, 8443, 8883)
+DEFAULT_REVERSE_DNS_TIMEOUT = 0.75
 
 
 @dataclass
@@ -58,11 +60,26 @@ def arp_table() -> dict[str, str]:
     return table
 
 
-def reverse_name(ip: str) -> str | None:
-    try:
-        return socket.gethostbyaddr(ip)[0]
-    except (socket.herror, socket.gaierror, OSError):
-        return None
+def reverse_name(ip: str, timeout: float = DEFAULT_REVERSE_DNS_TIMEOUT) -> str | None:
+    """Resolve one address without allowing a stale neighbor to stall a scan."""
+    if timeout < 0:
+        raise ValueError("timeout must be non-negative")
+
+    result: list[str] = []
+
+    def lookup() -> None:
+        try:
+            result.append(socket.gethostbyaddr(ip)[0])
+        except (socket.herror, socket.gaierror, OSError):
+            return
+
+    # The platform resolver may ignore Python's socket default timeout. A
+    # daemon worker gives the scan a hard upper bound without leaving a stuck
+    # resolver thread alive after the process exits.
+    worker = threading.Thread(target=lookup, name=f"reverse-dns-{ip}", daemon=True)
+    worker.start()
+    worker.join(timeout)
+    return result[0] if result else None
 
 
 def port_open(ip: str, port: int, timeout: float = 0.25) -> bool:
@@ -112,7 +129,16 @@ def main() -> int:
         help="Probe ports on every ICMP/ARP-observed host, not just Chamberlain OUI matches",
     )
     parser.add_argument("--output", default="captures/lan/latest.json")
+    parser.add_argument(
+        "--reverse-dns-timeout",
+        type=float,
+        default=DEFAULT_REVERSE_DNS_TIMEOUT,
+        help="Maximum seconds to wait for each reverse-DNS lookup (default: %(default)s)",
+    )
     args = parser.parse_args()
+
+    if args.reverse_dns_timeout < 0:
+        parser.error("--reverse-dns-timeout must be non-negative")
 
     network = ipaddress.ip_network(args.subnet, strict=False)
     if not isinstance(network, ipaddress.IPv4Network):
@@ -142,7 +168,7 @@ def main() -> int:
             Host(
                 ip=ip,
                 mac=mac,
-                hostname=reverse_name(ip),
+                hostname=reverse_name(ip, args.reverse_dns_timeout),
                 chamberlain_oui=candidate,
                 responds_to_ping=ping_results.get(ip, False),
                 open_ports=opened,

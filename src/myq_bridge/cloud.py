@@ -180,9 +180,9 @@ class MyQCloudClient:
         self._raise(response, "token refresh")
         payload = response.json()
         access = payload.get("access_token")
-        refresh = payload.get("refresh_token")
-        if not access or not refresh:
-            raise MyQAuthError("MyQ token refresh response omitted access/refresh token")
+        refresh = payload.get("refresh_token") or self.session.refresh_token
+        if not access:
+            raise MyQAuthError("MyQ token refresh response omitted access token")
         self.session = replace(
             self.session,
             access_token=str(access),
@@ -213,14 +213,16 @@ class MyQCloudClient:
         payload = response.json()
         return list(payload.get("items") or [])
 
-    def door_status(self) -> list[dict[str, Any]]:
+    def door_status(self, account_id: str | None = None) -> list[dict[str, Any]]:
         """Return a compact automation-friendly summary of every garage door."""
         doors: list[dict[str, Any]] = []
         for account in self.accounts():
-            account_id = str(account.get("id") or "")
-            if not account_id:
+            current_account_id = str(account.get("id") or "")
+            if not current_account_id:
                 continue
-            for device in self.devices(account_id):
+            if account_id is not None and current_account_id != str(account_id):
+                continue
+            for device in self.devices(current_account_id):
                 state = device.get("state") or {}
                 if not isinstance(state, dict):
                     state = {}
@@ -231,7 +233,7 @@ class MyQCloudClient:
                     continue
                 doors.append(
                     {
-                        "account_id": str(device.get("account_id") or account_id),
+                        "account_id": str(device.get("account_id") or current_account_id),
                         "door_opener_id": opener_id,
                         "name": device.get("name") or "Garage Door",
                         "model": device.get("device_model"),

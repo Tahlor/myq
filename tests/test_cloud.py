@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 
 import httpx
+from fastapi.testclient import TestClient
 
+import myq_bridge.cloud_cli as cloud_cli
 from myq_bridge.cloud import (
     ACCOUNTS_URL,
     AUTH_URL,
@@ -46,6 +48,24 @@ def test_refresh_rotates_and_persists_session(tmp_path: Path):
     assert refreshed.refresh_token == "new-refresh"
     assert store.load() == refreshed
     assert len(requests) == 1
+
+
+def test_refresh_keeps_existing_refresh_token_when_not_rotated():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == AUTH_URL
+        return httpx.Response(200, json={"access_token": "new-access"})
+
+    client = MyQCloudClient(
+        CloudSession("old-access", "old-refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        refreshed = client.refresh()
+    finally:
+        client.close()
+
+    assert refreshed.access_token == "new-access"
+    assert refreshed.refresh_token == "old-refresh"
 
 
 def test_401_refreshes_then_retries_account_request():
@@ -181,3 +201,28 @@ def test_session_store_accepts_legacy_jwt_key(tmp_path: Path):
     assert loaded is not None
     assert loaded.access_token == "access"
     assert loaded.refresh_token == "refresh"
+
+
+def test_account_scoped_cloud_status_endpoint(monkeypatch):
+    class FakeClient:
+        def close(self):
+            pass
+
+        def door_status(self, account_id=None):
+            return [{"account_id": account_id, "door_state": "closed"}]
+
+    monkeypatch.setattr(cloud_cli, "_client", lambda: FakeClient())
+    app = cloud_cli.create_app("local-api-key-1234")
+
+    with TestClient(app) as web:
+        response = web.get(
+            "/accounts/acct-1/status",
+            headers={"X-API-Key": "local-api-key-1234"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "backend": "direct-cloud",
+        "account_id": "acct-1",
+        "doors": [{"account_id": "acct-1", "door_state": "closed"}],
+    }

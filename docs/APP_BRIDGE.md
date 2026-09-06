@@ -191,10 +191,11 @@ Then use Track B1 to recover the current cloud calls. If authenticated requests 
 
 ## Current live unknowns
 
-- Can the official app display its authenticated dashboard after the OAuth callback once the independent `LoginActivity` focus-loss ANR is resolved?
+- Can the official app's standard package-launcher Splash/Login path be made stable on the Superbox? The explicit exported dashboard activity currently supplies the authenticated foreground path.
 - Does its login WebView work with the Superbox's current WebView, or does WebView need an update?
 - Does the app reject the Superbox's exposed `su` binary?
-- Which MyQ accessibility resource IDs are stable on the real dashboard?
+- Which dashboard action selector can be tested safely? The state selector `com.chamberlain.android.liftmaster.myq:id/device_state` is stable in the current build; the live circular control remains intentionally unconfigured.
+- Can the direct-cloud preflight path complete one explicitly authorized action with physical observation and post-state verification?
 - Does the native service remain bound and its TCP server recover after Superbox reboot?
 - Does the authenticated MyQ session remain usable through app restart and Superbox reboot?
 - Can a newer myQ APK reuse a session created by the older build without a new Integrity check?

@@ -88,6 +88,12 @@ The observation is repeatable with `scripts/capture_router_conntrack.ps1`. It us
 
 **Important:** no listening TCP ports does not rule out a myQ device. An opener can operate as an outbound-only TLS/MQTT client.
 
+## Current live recon — 2026-09-06
+
+The Windows host's active Ethernet interface is on the private `192.168.187.0/24` network with the expected private gateway. A fresh read-only sweep observed 25 neighbors and no known Chamberlain OUI matches; the prior `MyQ-*` candidate was not present in the fresh DNS/ARP result. Targeted checks against that prior candidate found no response on TCP 80, 443, 1883, 8080, 8443, or 8883, and the previously observed setup-page GETs were unavailable during this run.
+
+The router-side read-only conntrack check still reported one matching TCP/8883 entry for the prior candidate. This confirms current outbound-port evidence but still provides no payload, TLS SNI, or MQTT framing. No local listener was identified, and no network, opener, DNS, firewall, or forwarding state was changed.
+
 ## Superbox capture-tool check — 2026-09-05
 
 The rooted Superbox was checked as a possible short-term observation point. Its system `toybox` is present, but the image exposes no `tcpdump`, `tshark`, or `netcat` command. No capture binary was installed and no interception or traffic mutation was attempted. A router/AP capture, managed-switch mirror, or another already-approved observation point is still needed to classify the opener's outbound protocol.

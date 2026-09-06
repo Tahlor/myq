@@ -8,6 +8,7 @@ artifacts/
 
 # Android build output
 android_bridge/.gradle/
+android_bridge/.kotlin/
 android_bridge/**/build/
 
 # APK / reverse-engineering outputs

@@ -6,14 +6,14 @@ Software-only integration work for Chamberlain/LiftMaster myQ devices. The goal 
 
 We are pursuing three software layers in parallel, ordered from easiest to most independent:
 
-1. **Official-app bridge (working code, live validation pending)**
+1. **Official-app bridge (working code, foreground-app validation pending)**
    `Home automation -> Superbox:8765 -> official myQ Android app -> myQ cloud -> opener`
-2. **Direct-cloud bridge (implemented, initial authorized session pending)**
+2. **Direct-cloud bridge (implemented, authorized read-only session validated 2026-09-06)**
    `Home automation -> local daemon:8766 -> myQ v6 cloud -> opener`
 3. **True local control (protocol-recovery track)**
    `Home automation -> opener on LAN`, ideally with no Chamberlain cloud.
 
-The first two are complementary: the official app can remain a compatibility/bootstrap fallback even if direct cloud calls become the normal path.
+The first two are complementary: the official app can remain a compatibility/bootstrap fallback even if direct cloud calls become the normal path. Per the current cloud handoff, direct cloud is still experimental protocol/diagnostic tooling; the Superbox bridge remains the production-priority fallback.
 
 ## Current 2026 direct-cloud finding
 
@@ -26,7 +26,9 @@ Current defaults are configurable but start from the working August 2026 client 
 - token endpoint: `partner-identity.myq-cloud.com/connect/token`
 - account/device APIs: current v6/v6.2 MyQ cloud endpoints
 
-This is important because the observed refresh and door-command flow does **not** require Play Integrity/App Check fields. The remaining question is how best to bootstrap the first authorized access/refresh-token pair from our own authorized account. Do not commit tokens.
+This is important because the observed refresh and door-command flow does **not** require Play Integrity/App Check fields. The first authorized Android session has now been bootstrapped locally and validated through the read-only client. Do not commit tokens.
+
+The 2026-09-06 live validation refreshed the Android-issued session, discovered one account with a garage door and hub, and read the door as closed and online. No mutating endpoint was called.
 
 Once a local authorized session exists in ignored `config/cloud_session.json` (copy `config/cloud_session.example.json`), the direct client can:
 
@@ -53,7 +55,7 @@ myq-cloud accounts
 
 The extractor writes only the ignored session file and reports presence/absence; it does not print access or refresh tokens.
 
-The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle.
+The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle. It remains an experimental direct-cloud path until session durability and command behavior are revalidated.
 
 ## Official-app / Superbox bridge
 
@@ -87,7 +89,7 @@ Invoke-RestMethod http://<superbox-ip>:8765/debug/nodes -Headers $headers
 Invoke-RestMethod http://<superbox-ip>:8765/status -Headers $headers
 ```
 
-The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
+The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. It never launches myQ from the LAN server: the user-facing activity must bring myQ to the foreground before UI reads or commands. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
 
 ## Protocol-recovery tooling
 
@@ -119,10 +121,11 @@ A garage door is a physical access-control device. The project:
 - requires an API key on local control/state APIs;
 - performs no geolocation-triggered opening by default;
 - serializes UI commands;
+- requires myQ to already be in the foreground before UI reads or commands;
 - no-ops when an explicit requested state is already observed;
 - refuses a UI toggle when current state is unknown;
 - keeps credentials, rotating OAuth tokens, APKs, screenshots/UI dumps, pcaps and raw captures out of Git.
 
 For the one-time official-app bootstrap, use `config/myq_credentials.example.json` as the shape for the ignored `config/myq_credentials.local.json` (or let the Bitwarden import workflow create/update it). Preserve the existing local `bridge_api_key` when adding the account fields. The local file is only a working copy for this checkout; its email and password are never printed, committed, or sent to a third party by the repository scripts.
 
-See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`, and issues #1–#3 for live evidence gates.
+See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`, and issues #1, #3, #5, and #6 for live evidence gates; issue #2 remains experimental protocol work.

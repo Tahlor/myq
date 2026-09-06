@@ -19,9 +19,11 @@ A new public Home Assistant integration, `vector-sec/chamberlain-myq-hacs`, was 
 
 This is stronger than the old 2023 API evidence. We therefore clean-room implemented the current protocol facts in `src/myq_bridge/cloud.py` and `src/myq_bridge/cloud_cli.py`. Do not copy/vendor the external implementation; its repository currently has no license file.
 
-The remaining B1 gate is **initial authorized-session bootstrap**. Once an authorized access/refresh-token pair is available locally, our client can rotate it and persist the new pair atomically in ignored `config/cloud_session.json`.
+The remaining B1 gate was **initial authorized-session bootstrap**. Once an authorized access/refresh-token pair is available locally, our client can rotate it and persist the new pair atomically in ignored `config/cloud_session.json`. The current cloud handoff keeps this path experimental and diagnostic; the Superbox bridge remains the production-priority fallback while session durability and command behavior are established.
 
-As of 2026-09-04, this checkout has no local session file and no token environment variables, so live refresh/account validation is intentionally blocked pending an authorized bootstrap pair. No token material was requested or recorded by the agent.
+On 2026-09-04, before the authorized bootstrap, this checkout had no local session file and no token environment variables, so live refresh/account validation was intentionally blocked. No token material was requested or recorded at that checkpoint; the result is superseded by the authorized validation below.
+
+On 2026-09-06, the owner-authorized Android OAuth flow supplied that bootstrap pair. The extractor persisted it only to the ignored session file; `myq-cloud refresh`, account discovery, device discovery, and read-only status all succeeded. The live account returned one garage door plus its hub, with the door `closed` and `online`. No mutating endpoint was called. The official APK subsequently ANRed while handling the OAuth callback, and a later cold start independently reproduced a `LoginActivity` focus-loss ANR, so the direct client is currently the reliable authenticated read path while app lifecycle stability remains an open Track A issue.
 
 ```powershell
 Copy-Item config\cloud_session.example.json config\cloud_session.json
@@ -123,7 +125,7 @@ Also inspect Android resources for base URLs, remote-config keys and feature fla
 
 Prefer observation before bypassing anything.
 
-1. Start the authenticated official app.
+1. Start the authenticated official app through its user-facing/foreground path; do not ask a background service to navigate it.
 2. Capture `logcat` while refreshing the door dashboard.
 3. Record DNS destinations from the Android host/network.
 4. If static analysis shows ordinary OkHttp/Retrofit and traffic details are still missing, attach Frida to log **non-secret request metadata**.

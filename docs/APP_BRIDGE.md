@@ -48,6 +48,14 @@ The bridge host now also registers a boot receiver so the foreground HTTP servic
 
 The installed service was rechecked while OAuth MFA remained in Chrome: `GET /health` returned `{"status":"ok"}`, while an invalid-key request to the protected `/status` endpoint returned `401` before touching the myQ UI. This confirms both liveness and the authentication gate without launching the app or sending a garage command.
 
+## Background navigation guard and independent app ANR — 2026-09-06
+
+The original native bridge tried to launch myQ from its foreground HTTP service whenever a protected request arrived without an attached UI root. On Android 12, a live probe showed the background activity-start abort immediately before a `LoginActivity` focus-loss ANR. The bridge now leaves navigation to the user-facing `MainActivity` and waits only for an already-foreground myQ root. If myQ is not foreground, protected UI reads return HTTP `409` with `myQ must be in the foreground before reading or commanding it`; no activity start is attempted.
+
+The rebuilt APK was installed and the accessibility service was rebound while preserving the existing enabled service list. A protected `/debug/nodes` probe with the bridge activity foreground returned the expected `409`, and no new myQ launch or background-start abort occurred in that probe window.
+
+The official app was then launched directly from the Superbox launcher with the bridge activity out of focus. It reached `LoginActivity`, the launcher regained focus, and Android recorded the same `LoginActivity` focus-loss ANR. Repeating the launch with the bridge accessibility component temporarily disabled produced the same result. This separates the remaining cold-start/login lifecycle failure from the bridge's removed background navigation; no door command was issued.
+
 ## Authorized credential bootstrap — 2026-09-05
 
 The existing Pi3 Broadlink deployment was reachable through its configured SSH profile. Its expected `/home/pi/bashrc/secure/credentials_myq` file was present and had the two-line email/password shape used by the Broadlink controller. The values were copied in memory into ignored `config/myq_credentials.local.json` with `scripts/import_pi3_myq_credentials.ps1`, preserving the bridge API key. The temporary raw copy was removed immediately after import. Secret values were not printed, committed, or added to documentation.
@@ -58,6 +66,14 @@ Our existing SuperBOX S7MAX is preferable to a new Android VM because it is alre
 2. `src/myq_bridge/` — Python/UIAutomator bring-up and diagnostic fallback. Useful for inspecting the UI and testing selectors rapidly from a development machine.
 
 Both use the same `config/doors.json` selector schema.
+
+## Live authorized session and read-only validation — 2026-09-06
+
+The owner-authorized Android OAuth flow completed on the Superbox. The Chrome custom tab closed and returned control to myQ; the APK then became unresponsive in `LoginActivity` during callback handling and Android force-finished the app. Before that ANR, the encrypted app preferences contained both rotating OAuth values, and `scripts/extract_myq_session.ps1` wrote only the ignored `config/cloud_session.json` session shape.
+
+The direct client then successfully refreshed the Android-issued session, discovered one account containing a garage door and hub, and read the door as `closed` and `online`. No open, close, lock-mode, or other mutating request was issued. The current result is therefore a working direct-cloud read path with an official-app callback/UI stability issue still open.
+
+A separate cold-start test on the same date reproduced the `LoginActivity` focus-loss ANR before any OAuth interaction, including with the bridge accessibility component disabled. The app's callback ANR and this cold-start ANR are therefore tracked as official-app/host lifecycle evidence, not as a reason to reintroduce background activity launches in the bridge.
 
 ## Phase A1 — install and authenticate official myQ
 
@@ -99,6 +115,8 @@ The installer:
 - prints the Superbox LAN API endpoint and secret.
 
 The foreground host service keeps the HTTP port available while myQ hands off to Chrome for OAuth. The accessibility component remains package-scoped to `com.chamberlain.android.liftmaster.myq`, and it only reads or acts on that package's root. It is not a generic remote UI-control service.
+
+The service does not bring myQ to the foreground on behalf of a LAN request. Use the companion activity's **Open myQ** action (or an already-running myQ task), verify the dashboard, and then call `/status` or `/debug/nodes`.
 
 If automatic accessibility enablement is undesirable for a test, pass `-NoEnableAccessibility` and enable **myQ LAN Bridge** manually in Android Accessibility settings.
 
@@ -169,10 +187,10 @@ Then use Track B1 to recover the current cloud calls. If authenticated requests 
 
 ## Current live unknowns
 
-- Does the owner-authorized login complete on the S7MAX's 32-bit ARM Android 12 build?
+- Can the official app display its authenticated dashboard after the OAuth callback once the independent `LoginActivity` focus-loss ANR is resolved?
 - Does its login WebView work with the Superbox's current WebView, or does WebView need an update?
 - Does the app reject the Superbox's exposed `su` binary?
 - Which MyQ accessibility resource IDs are stable on the real dashboard?
 - Does the native service remain bound and its TCP server recover after Superbox reboot?
-- Does the authenticated MyQ session persist through app restart and Superbox reboot?
+- Does the authenticated MyQ session remain usable through app restart and Superbox reboot?
 - Can a newer myQ APK reuse a session created by the older build without a new Integrity check?

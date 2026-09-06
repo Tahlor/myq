@@ -1,7 +1,5 @@
 package com.tahlor.myqbridge
 
-import android.content.Context
-import android.content.Intent
 import android.os.SystemClock
 
 
@@ -17,19 +15,18 @@ object BridgeRuntime {
         if (accessibilityService === service) accessibilityService = null
     }
 
-    fun requireAccessibilityService(context: Context): BridgeAccessibilityService {
+    fun requireAccessibilityService(): BridgeAccessibilityService {
         accessibilityService?.let { return it }
 
-        val launch = context.packageManager.getLaunchIntentForPackage(BridgeAccessibilityService.MYQ_PACKAGE)
-            ?: throw IllegalStateException("Official myQ app is not installed")
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        context.startActivity(launch)
-
-        val deadline = SystemClock.uptimeMillis() + 6_000L
+        // Do not launch myQ from the HTTP foreground service. Android may reject
+        // that background activity start, and the attempted focus handoff can
+        // leave LoginActivity stuck handling a focus-loss event. The companion
+        // activity / user is responsible for bringing myQ to the foreground.
+        val deadline = SystemClock.uptimeMillis() + 2_000L
         while (SystemClock.uptimeMillis() < deadline) {
             accessibilityService?.let { return it }
-            SystemClock.sleep(250L)
+            SystemClock.sleep(100L)
         }
-        throw IllegalStateException("myQ accessibility service is not connected")
+        throw IllegalStateException("myQ LAN accessibility service is not connected")
     }
 }

@@ -1,7 +1,6 @@
 package com.tahlor.myqbridge
 
 import android.accessibilityservice.AccessibilityService
-import android.content.Intent
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -114,16 +113,17 @@ class BridgeAccessibilityService : AccessibilityService() {
 
     private fun ensureMyQForeground(): AccessibilityNodeInfo {
         currentMyQRoot()?.let { return it }
-        val intent = packageManager.getLaunchIntentForPackage(MYQ_PACKAGE)
-            ?: throw IllegalStateException("Official myQ app is not installed")
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        startActivity(intent)
-        val deadline = System.currentTimeMillis() + 6_000L
+        // The HTTP server runs from a foreground service. Starting an activity
+        // here is still subject to Android's background-activity-start rules;
+        // attempting it while Chrome or the launcher is focused can interrupt
+        // LoginActivity and produce a focus-loss ANR. Let the user-facing
+        // activity (or an already-running app task) own foreground navigation.
+        val deadline = System.currentTimeMillis() + 2_000L
         while (System.currentTimeMillis() < deadline) {
-            Thread.sleep(250L)
+            Thread.sleep(100L)
             currentMyQRoot()?.let { return it }
         }
-        throw IllegalStateException("myQ did not become the active accessibility window")
+        throw IllegalStateException("myQ must be in the foreground before reading or commanding it")
     }
 
     private fun currentMyQRoot(): AccessibilityNodeInfo? {

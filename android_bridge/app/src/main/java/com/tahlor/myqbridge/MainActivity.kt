@@ -29,8 +29,6 @@ class MainActivity : Activity() {
             apiKey = generateKey()
             prefs.edit().putString(BridgeHttpServer.API_KEY, apiKey).apply()
         }
-        startBridgeHost()
-
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(36, 36, 36, 36)
@@ -46,7 +44,7 @@ class MainActivity : Activity() {
                 append("The bridge listens on TCP ${BridgeHttpServer.PORT} from a local foreground service. UI reads and commands require the accessibility service.\n\n")
                 append("API key configured: …${apiKey.takeLast(6)}\n")
                 append("Door selectors: Android/data/com.tahlor.myqbridge/files/doors.json\n\n")
-                append("Enable the accessibility service, then open myQ and verify the dashboard before sending commands.")
+                append("Enable the accessibility service, then open myQ and verify the dashboard before sending commands. The LAN API will not launch myQ in the background.")
             }
             textSize = 17f
         }, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -62,6 +60,13 @@ class MainActivity : Activity() {
             }
         })
         setContentView(container)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Start only once the activity is visible so Android's foreground-
+        // service launch policy has an unambiguous user-facing caller.
+        startBridgeHost()
     }
 
     private fun startBridgeHost() {

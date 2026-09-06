@@ -110,7 +110,8 @@ class BridgeHttpServer(
                     else -> respond(client, 404, errorJson("Not found"))
                 }
             } catch (e: Exception) {
-                try { respond(client, 500, errorJson(e.message ?: e.javaClass.simpleName)) } catch (_: Exception) { }
+                val status = if (e is IllegalStateException) 409 else 500
+                try { respond(client, status, errorJson(e.message ?: e.javaClass.simpleName)) } catch (_: Exception) { }
             }
         }
     }

@@ -30,12 +30,12 @@ class BridgeHostService : Service(), BridgeRequestTarget {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun status(): JSONObject = BridgeRuntime.requireAccessibilityService(this).status()
+    override fun status(): JSONObject = BridgeRuntime.requireAccessibilityService().status()
 
-    override fun debugNodes(): JSONObject = BridgeRuntime.requireAccessibilityService(this).debugNodes()
+    override fun debugNodes(): JSONObject = BridgeRuntime.requireAccessibilityService().debugNodes()
 
     override fun command(doorName: String, action: String): JSONObject =
-        BridgeRuntime.requireAccessibilityService(this).command(doorName, action)
+        BridgeRuntime.requireAccessibilityService().command(doorName, action)
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

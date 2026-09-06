@@ -120,6 +120,8 @@ The service does not bring myQ to the foreground on behalf of a LAN request. Use
 
 On 2026-09-06, the user-facing launcher path was narrowed to the official APK's exported `com.chamberlain.myq.main.HomeTabsActivity`. A cold explicit launch of that dashboard activity completed in 2.487 seconds and remained foreground without the `LoginActivity` focus-loss ANR. The package launcher still takes the Splash/Login path that reproduces the ANR, so this dashboard shortcut is the current bridge validation path. After rebinding the service and closing the first-run tour, the native bridge observed 42 dashboard nodes and two consecutive `GET /status` reads returned one configured `Garage Door` as `closed`.
 
+The app-session restart check also passed on 2026-09-06: after force-stopping only the official APK, a cold `HomeTabsActivity` launch completed in 2.364 seconds without an ANR, and two subsequent bridge reads again returned `Garage Door: closed`. This confirms the persisted authenticated dashboard/session path across an app-process restart; a full Superbox reboot test remains intentionally pending.
+
 The dashboard's large `device_view_progress_indicator` is a live action surface, not a safe navigation target. A calibration tap on 2026-09-06 produced a transient `Opening` UI state and then a `Garage Door is not responding` alert. The alert was dismissed without another device tap; two independent direct-cloud status reads and two subsequent bridge reads reported `closed` and `online=True`. The selector is intentionally not present in the state-only local configuration until an explicit action-control test is authorized and can be physically observed.
 
 If automatic accessibility enablement is undesirable for a test, pass `-NoEnableAccessibility` and enable **myQ LAN Bridge** manually in Android Accessibility settings.
@@ -197,5 +199,5 @@ Then use Track B1 to recover the current cloud calls. If authenticated requests 
 - Which dashboard action selector can be tested safely? The state selector `com.chamberlain.android.liftmaster.myq:id/device_state` is stable in the current build; the live circular control remains intentionally unconfigured.
 - Can the direct-cloud preflight path complete one explicitly authorized action with physical observation and post-state verification?
 - Does the native service remain bound and its TCP server recover after Superbox reboot?
-- Does the authenticated MyQ session remain usable through app restart and Superbox reboot?
+- Does the authenticated MyQ session remain usable through a full Superbox reboot? App-process restart is now verified.
 - Can a newer myQ APK reuse a session created by the older build without a new Integrity check?

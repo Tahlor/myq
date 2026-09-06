@@ -14,7 +14,7 @@ The project is complete only when it has a trustworthy, software-only path for t
 
 - Direct-cloud read: two consecutive owner-authorized status reads each returned one door as `closed` and `online`; no mutating endpoint was called.
 - Direct-cloud command: the client and REST/CLI callers now expose a read-only preflight and enforce serialized before-state and after-state verification in tests. A temporary loopback REST service also passed authenticated `/health`, `/status`, and `/preflight/open` checks with `closed → open` readiness; no live mutating request has been made.
-- Official-app bridge: the dashboard shortcut is stable, the bridge reads `Garage Door: closed` twice, and background navigation is guarded. The package launcher still reproduces a `LoginActivity` focus-loss ANR, and the dashboard's live action surface needs an explicitly authorized test.
+- Official-app bridge: the dashboard shortcut is stable across an app-process restart, the bridge reads `Garage Door: closed` twice after restart, and background navigation is guarded. The package launcher still reproduces a `LoginActivity` focus-loss ANR, and the dashboard's live action surface needs an explicitly authorized test; full Superbox reboot persistence remains pending.
 - LAN track: current evidence confirms an outbound TCP/8883 session for the probable device, but no local status or command protocol is proven.
 
 The goal remains active until the read and command gates pass on the real account and the remaining handoff gates are satisfied.

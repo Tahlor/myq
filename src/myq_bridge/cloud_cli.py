@@ -30,6 +30,14 @@ def _dump(value: Any) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
 
 
+def _require_action_confirmation(action: str, confirmation: str | None) -> None:
+    if confirmation != action:
+        raise HTTPException(
+            status_code=428,
+            detail=f"Set X-MyQ-Confirm: {action} to authorize this command",
+        )
+
+
 def create_app(api_key: str) -> FastAPI:
     if len(api_key) < 16:
         raise RuntimeError("MYQ_API_KEY must be at least 16 characters")
@@ -94,14 +102,24 @@ def create_app(api_key: str) -> FastAPI:
         "/accounts/{account_id}/doors/{door_opener_id}/open",
         dependencies=[protected],
     )
-    def open_door(account_id: str, door_opener_id: str) -> dict[str, Any]:
+    def open_door(
+        account_id: str,
+        door_opener_id: str,
+        x_myq_confirm: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _require_action_confirmation("open", x_myq_confirm)
         return translate(lambda: client.door_command(account_id, door_opener_id, "open"))
 
     @app.post(
         "/accounts/{account_id}/doors/{door_opener_id}/close",
         dependencies=[protected],
     )
-    def close_door(account_id: str, door_opener_id: str) -> dict[str, Any]:
+    def close_door(
+        account_id: str,
+        door_opener_id: str,
+        x_myq_confirm: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _require_action_confirmation("close", x_myq_confirm)
         return translate(lambda: client.door_command(account_id, door_opener_id, "close"))
 
     @app.post(
@@ -144,6 +162,12 @@ def main() -> None:
         command = sub.add_parser(action, help=f"{action.title()} a door explicitly")
         command.add_argument("account_id")
         command.add_argument("door_opener_id")
+        command.add_argument(
+            "--confirm",
+            action="store_true",
+            required=True,
+            help=f"Confirm that this command is intentionally requesting {action}",
+        )
 
     serve = sub.add_parser("serve", help="Expose the direct client as a local REST API")
     serve.add_argument("--host", default=os.environ.get("MYQ_BIND", "0.0.0.0"))
@@ -169,6 +193,8 @@ def main() -> None:
         elif args.command == "preflight":
             _dump(client.door_preflight(args.account_id, args.door_opener_id, args.action))
         elif args.command in {"open", "close"}:
+            if not args.confirm:
+                parser.error(f"{args.command} requires --confirm")
             _dump(client.door_command(args.account_id, args.door_opener_id, args.command))
         else:
             parser.error(f"Unknown command {args.command}")

@@ -175,13 +175,16 @@ class MyQDriver:
                 selector = door.toggle
             if selector is None:
                 raise RuntimeError(f"No selector configured for {door.name!r} -> {target}")
-            if (
-                target in {"open", "closed"}
-                and direct_selector is None
-                and before not in {"open", "closed"}
-            ):
+            if (target == "toggle" or target in {"open", "closed"}) and before not in {
+                "open",
+                "closed",
+            }:
+                if target == "toggle" or direct_selector is None:
+                    raise RuntimeError(
+                        f"Refusing blind toggle for {door.name!r}: current state is {before!r}"
+                    )
                 raise RuntimeError(
-                    f"Refusing blind toggle for {door.name!r}: current state is {before!r}"
+                    f"Refusing {target} for {door.name!r}: current state is {before!r}"
                 )
 
             self._click(selector)
@@ -196,5 +199,16 @@ class MyQDriver:
                     break
                 if desired is None and after != before and after != "unknown":
                     break
+
+            verified = (
+                after == desired
+                if desired is not None
+                else after != before and after != "unknown"
+            )
+            if not verified:
+                raise RuntimeError(
+                    f"Requested {target} for {door.name!r} was not verified "
+                    f"(before={before}, after={after})"
+                )
 
             return {"ok": True, "changed": True, "before": before, "after": after}

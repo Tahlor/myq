@@ -106,7 +106,7 @@ class BridgeHttpServer(
                     method == "GET" && path == "/debug/nodes" ->
                         respond(client, 200, target.debugNodes())
                     method == "POST" && path.startsWith("/doors/") ->
-                        handleDoorCommand(client, path)
+                        handleDoorCommand(client, path, headers)
                     else -> respond(client, 404, errorJson("Not found"))
                 }
             } catch (e: Exception) {
@@ -116,7 +116,11 @@ class BridgeHttpServer(
         }
     }
 
-    private fun handleDoorCommand(client: Socket, path: String) {
+    private fun handleDoorCommand(
+        client: Socket,
+        path: String,
+        headers: Map<String, String>,
+    ) {
         val pieces = path.removePrefix("/doors/").split('/')
         if (pieces.size != 2) {
             respond(client, 404, errorJson("Expected /doors/{name}/{open|close|toggle}"))
@@ -126,6 +130,14 @@ class BridgeHttpServer(
         val action = pieces[1].lowercase()
         if (action !in setOf("open", "close", "toggle")) {
             respond(client, 400, errorJson("Unsupported door action"))
+            return
+        }
+        if (headers["x-myq-confirm"] != action) {
+            respond(
+                client,
+                428,
+                errorJson("Set X-MyQ-Confirm: $action to authorize this command"),
+            )
             return
         }
         try {
@@ -157,6 +169,7 @@ class BridgeHttpServer(
             401 -> "Unauthorized"
             404 -> "Not Found"
             409 -> "Conflict"
+            428 -> "Precondition Required"
             else -> "Internal Server Error"
         }
         val headers = buildString {

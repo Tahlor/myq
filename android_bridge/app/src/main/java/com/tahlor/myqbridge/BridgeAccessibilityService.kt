@@ -75,9 +75,14 @@ class BridgeAccessibilityService : AccessibilityService() {
         val selector = directSelector ?: door.toggleSelector
             ?: throw IllegalStateException("No selector configured for ${door.name} -> $action")
 
-        if (desired != null && directSelector == null && before !in setOf("open", "closed")) {
+        if ((desired != null || action == "toggle") && before !in setOf("open", "closed")) {
+            val method = if (action == "toggle" || directSelector == null) {
+                "blind toggle"
+            } else {
+                "$action command"
+            }
             throw IllegalStateException(
-                "Refusing blind toggle for ${door.name}: current state is $before"
+                "Refusing $method for ${door.name}: current state is $before"
             )
         }
 

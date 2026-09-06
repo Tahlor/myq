@@ -173,11 +173,12 @@ Native endpoints:
 - `POST /doors/{name}/close`
 - `POST /doors/{name}/toggle`
 
-Every non-health request requires `X-API-Key`.
+Every non-health request requires `X-API-Key`. Every mutating request also requires
+`X-MyQ-Confirm` with the exact action value (`open`, `close`, or `toggle`).
 
 Verify `GET /status` repeatedly before sending a command. During the first command test, physically observe the door and request an **explicit state** rather than `toggle`.
 
-Both implementations serialize operations. If an explicit `open`/`close` request has only a toggle selector available, the bridge reads current state first and **refuses to click when state is unknown**. It also no-ops if the requested state is already observed.
+Both implementations serialize operations. If an explicit `open`/`close` request has only a toggle selector available, the bridge reads current state first and **refuses to click when state is unknown**. It also no-ops if the requested state is already observed, and reports an error if the requested post-state is not verified.
 
 For production, firewall TCP `8765` to trusted home-automation clients / VLANs.
 

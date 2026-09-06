@@ -43,6 +43,9 @@ myq-cloud devices <account-id>
 # Read-only action preflight; inspect this before any explicit command.
 myq-cloud preflight <account-id> <door-opener-id> open
 
+# Mutating commands require an explicit confirmation flag.
+myq-cloud open <account-id> <door-opener-id> --confirm
+
 # Run a local authenticated REST facade on port 8766.
 $env:MYQ_API_KEY = '<local-secret>'
 myq-cloud serve
@@ -58,7 +61,7 @@ myq-cloud accounts
 
 The extractor writes only the ignored session file and reports presence/absence; it does not print access or refresh tokens.
 
-The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle. Each action caller first reads the named door, refuses an unknown, transitional, or offline state, sends at most one action, and returns success only after a fresh read verifies the requested state. A same-state request is a verified no-op; an unverified post-action state is an error. It remains an experimental direct-cloud path until session durability and live command behavior are revalidated.
+The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle. Mutating REST calls must also include `X-MyQ-Confirm: open` or `X-MyQ-Confirm: close` matching the endpoint. Each action caller first reads the named door, refuses an unknown, transitional, or offline state, sends at most one action, and returns success only after a fresh read verifies the requested state. A same-state request is a verified no-op; an unverified post-action state is an error. It remains an experimental direct-cloud path until session durability and live command behavior are revalidated.
 
 ## Official-app / Superbox bridge
 
@@ -92,7 +95,7 @@ Invoke-RestMethod http://<superbox-ip>:8765/debug/nodes -Headers $headers
 Invoke-RestMethod http://<superbox-ip>:8765/status -Headers $headers
 ```
 
-The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. It never launches myQ from the LAN server: the user-facing activity brings the app's dashboard activity to the foreground before UI reads or commands. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
+For a native command, add an action-matching `X-MyQ-Confirm` header (`open`, `close`, or `toggle`) to `$headers` and use an explicit endpoint. The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. It never launches myQ from the LAN server: the user-facing activity brings the app's dashboard activity to the foreground before UI reads or commands. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
 
 ## Protocol-recovery tooling
 
@@ -122,6 +125,7 @@ Current Chamberlain support documentation says myQ devices require outbound **TC
 A garage door is a physical access-control device. The project:
 
 - requires an API key on local control/state APIs;
+- requires action-specific confirmation on every mutating CLI/REST boundary;
 - performs no geolocation-triggered opening by default;
 - serializes UI commands;
 - requires myQ to already be in the foreground before UI reads or commands;

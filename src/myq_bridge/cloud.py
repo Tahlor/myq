@@ -359,8 +359,8 @@ class MyQCloudClient:
         reason = None
         if before not in {"open", "closed"}:
             reason = f"current state is {before!r}"
-        elif door.get("online") is False:
-            reason = "door is offline"
+        elif door.get("online") is not True:
+            reason = "door online state is not confirmed"
 
         return {
             "ready": reason is None,

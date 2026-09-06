@@ -24,6 +24,14 @@ def require_api_key(x_api_key: Annotated[str | None, Header()] = None) -> None:
 Auth = Depends(require_api_key)
 
 
+def _require_action_confirmation(action: str, confirmation: str | None) -> None:
+    if confirmation != action:
+        raise HTTPException(
+            status_code=428,
+            detail=f"Set X-MyQ-Confirm: {action} to authorize this command",
+        )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -66,17 +74,29 @@ def debug_nodes() -> dict:
 
 
 @app.post("/doors/{door_name}/open", dependencies=[Auth])
-def open_door(door_name: str) -> dict:
+def open_door(
+    door_name: str,
+    x_myq_confirm: str | None = Header(default=None),
+) -> dict:
+    _require_action_confirmation("open", x_myq_confirm)
     return _command(door_name, "open")
 
 
 @app.post("/doors/{door_name}/close", dependencies=[Auth])
-def close_door(door_name: str) -> dict:
+def close_door(
+    door_name: str,
+    x_myq_confirm: str | None = Header(default=None),
+) -> dict:
+    _require_action_confirmation("close", x_myq_confirm)
     return _command(door_name, "closed")
 
 
 @app.post("/doors/{door_name}/toggle", dependencies=[Auth])
-def toggle_door(door_name: str) -> dict:
+def toggle_door(
+    door_name: str,
+    x_myq_confirm: str | None = Header(default=None),
+) -> dict:
+    _require_action_confirmation("toggle", x_myq_confirm)
     return _command(door_name, "toggle")
 
 

@@ -53,5 +53,65 @@ def test_explicit_command_refuses_toggle_when_state_is_unknown():
 
     driver = FakeDriver()
     with pytest.raises(RuntimeError, match="Refusing blind toggle"):
+        driver.command("Garage Door", "toggle")
+    assert driver.clicked is False
+
+
+def test_command_fails_closed_when_post_state_is_not_verified(monkeypatch):
+    door = DoorConfig(
+        name="Garage Door",
+        state=Selector(resource_id="state"),
+        toggle=Selector(resource_id="toggle"),
+    )
+
+    class FakeDriver(MyQDriver):
+        def __init__(self):
+            self.settings = SimpleNamespace(doors=(door,))
+            self._lock = __import__("threading").RLock()
+            self.clicked = False
+            self.states = iter(("closed",))
+
+        def launch(self):
+            pass
+
+        def get_state(self, _door):
+            return next(self.states)
+
+        def _click(self, _selector):
+            self.clicked = True
+
+    driver = FakeDriver()
+    monotonic_values = iter((0.0, 13.0))
+    monkeypatch.setattr("myq_bridge.driver.time.monotonic", lambda: next(monotonic_values))
+
+    with pytest.raises(RuntimeError, match="was not verified"):
+        driver.command("Garage Door", "open")
+    assert driver.clicked is True
+
+
+def test_explicit_command_refuses_unstable_state_even_with_direct_selector():
+    door = DoorConfig(
+        name="Garage Door",
+        state=Selector(resource_id="state"),
+        open=Selector(resource_id="open"),
+    )
+
+    class FakeDriver(MyQDriver):
+        def __init__(self):
+            self.settings = SimpleNamespace(doors=(door,))
+            self._lock = __import__("threading").RLock()
+            self.clicked = False
+
+        def launch(self):
+            pass
+
+        def get_state(self, _door):
+            return "opening"
+
+        def _click(self, _selector):
+            self.clicked = True
+
+    driver = FakeDriver()
+    with pytest.raises(RuntimeError, match="Refusing open"):
         driver.command("Garage Door", "open")
     assert driver.clicked is False

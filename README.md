@@ -2,48 +2,30 @@
 
 Software-only integration work for Chamberlain/LiftMaster myQ devices. The goal is reliable home-automation control **without adding hardware to the garage opener**.
 
-## Architecture
+## Project strategy
 
-We are pursuing three software layers in parallel, ordered from easiest to most independent:
+We are pursuing three paths in parallel, but they are **not equal priorities**:
 
-1. **Official-app bridge (working code, live validation pending)**
-   `Home automation -> Superbox:8765 -> official myQ Android app -> myQ cloud -> opener`
-2. **Direct-cloud bridge (implemented, initial authorized session pending)**
-   `Home automation -> local daemon:8766 -> myQ v6 cloud -> opener`
-3. **True local control (protocol-recovery track)**
-   `Home automation -> opener on LAN`, ideally with no Chamberlain cloud.
+1. **Official-app bridge — practical 2026-working path**
+   `Broadlink -> Superbox:8765 -> official myQ Android app -> myQ cloud -> opener`
+2. **True local / opener-side control — preferred end state**
+   Either:
+   `Broadlink -> opener directly on LAN`
+   or:
+   `Broadlink -> local Chamberlain-service emulator <- opener redirected from Chamberlain cloud`
+3. **Direct unofficial MyQ cloud API — experimental protocol evidence only**
+   `local daemon -> undocumented myQ cloud API -> opener`
 
-The first two are complementary: the official app can remain a compatibility/bootstrap fallback even if direct cloud calls become the normal path.
+The project does **not** treat a reverse-engineered cloud REST/OAuth client as a reliable production solution merely because it can be made to work temporarily. Community integrations repeatedly broke as Chamberlain changed and blocked unofficial access.
 
-## Current 2026 direct-cloud finding
+## What counts as production-worthy
 
-A new August 2026 Home Assistant integration (`vector-sec/chamberlain-myq-hacs`) demonstrates the current v6 account/device/action endpoints and a normal OAuth refresh-token grant. We clean-room implemented those protocol facts in `src/myq_bridge/cloud.py`; we do not vendor or copy that repository's implementation.
+A path is production-worthy if either:
 
-Current defaults are configurable but start from the working August 2026 client identity:
+- it is demonstrably working in 2026 using Chamberlain's supported official app behavior; or
+- it is under our control locally and does not depend on undocumented Chamberlain cloud APIs.
 
-- client id: `IOS_CGI_MYQ`
-- app version: `5.315.0.66076`
-- token endpoint: `partner-identity.myq-cloud.com/connect/token`
-- account/device APIs: current v6/v6.2 MyQ cloud endpoints
-
-This is important because the observed refresh and door-command flow does **not** require Play Integrity/App Check fields. The remaining question is how best to bootstrap the first authorized access/refresh-token pair from our own authorized account. Do not commit tokens.
-
-Once a local authorized session exists in ignored `config/cloud_session.json` (copy `config/cloud_session.example.json`), the direct client can:
-
-```powershell
-# Refresh + rotate the session normally.
-myq-cloud refresh
-
-# Discover account/device IDs.
-myq-cloud accounts
-myq-cloud devices <account-id>
-
-# Run a local authenticated REST facade on port 8766.
-$env:MYQ_API_KEY = '<local-secret>'
-myq-cloud serve
-```
-
-The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle.
+Today that means the **official-app/Superbox bridge** is the practical path while true-local work continues.
 
 ## Official-app / Superbox bridge
 
@@ -57,13 +39,14 @@ The existing **SuperBOX S7MAX** is our Android host:
 
 `android_bridge/` is an on-device companion accessibility service and authenticated HTTP server. GitHub CI builds it as artifact **`myq-superbox-bridge-debug`**.
 
+A June 2026 community implementation independently demonstrated the same general pattern — run the official MyQ Android app in a controlled Android environment, automate it, and expose a local REST API — as a working stateful bridge. Our Superbox-native approach removes the need for a separate ReDroid/Docker host in steady state.
+
 First live run:
 
 ```powershell
 $serial = .\scripts\connect_superbox.ps1
 
-# Install a locally obtained official myQ APK/split set; authenticate interactively.
-.\scripts\install_myq_superbox.ps1 -PackagePath C:\path\to\myq -AdbSerial $serial
+# Official app is already installed; authenticate interactively if needed.
 
 # Build/install our companion and get its local API key.
 $key = .\scripts\build_install_android_bridge.ps1 -AdbSerial $serial | Select-Object -Last 1
@@ -78,6 +61,77 @@ Invoke-RestMethod http://<superbox-ip>:8765/status -Headers $headers
 ```
 
 The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
+
+## True local path A — opener pairing/provisioning service
+
+Supported MyQ Wi-Fi setup proves that at least some openers expose a temporary local Wi-Fi AP such as `myQ-XXX` and a setup website at `setup.myqdevice.com`.
+
+Issue #5 investigates the opener's own shipped provisioning UI/API:
+
+1. enter normal supported setup mode without factory-resetting;
+2. connect a disposable client to `myQ-*`;
+3. capture `setup.myqdevice.com` HTML/JS/API traffic;
+4. let the shipped UI reveal its own endpoints;
+5. return the opener to normal home Wi-Fi;
+6. test those **exact endpoints** against the opener's normal LAN IP;
+7. if status or explicit command primitives survive, wrap them in our stable local API.
+
+Best-case result:
+
+```text
+Broadlink -> local /garage/* gateway -> opener directly
+```
+
+## True local path B — emulate Chamberlain's service
+
+Current Chamberlain support documentation explicitly says MyQ devices require TCP **8883** to communicate with MyQ servers. Port 8883 is conventionally MQTT-over-TLS, but the project does not call the protocol MQTT until live/static evidence confirms it.
+
+Issues #3 and #6 investigate the opener's own outbound client behavior:
+
+1. positively identify the opener;
+2. capture DNS, destination host/port, TLS SNI/ALPN/certificate metadata and reconnect cadence;
+3. determine whether the opener follows DNS redirection;
+4. redirect only the discovered Chamberlain hostname to a passive local listener;
+5. characterize normal CA validation vs pinning vs mutual TLS;
+6. confirm the application protocol;
+7. recover telemetry and command semantics from the opener side;
+8. implement the smallest local service emulator that can keep the opener connected and eventually issue one explicit command.
+
+Desired end state:
+
+```text
+Broadlink -> local /garage/* API -> local Chamberlain-service emulator
+                                      ^
+                                      |
+                                 existing opener
+```
+
+This would remove Chamberlain's cloud from the control loop without adding garage hardware.
+
+## Broadlink integration contract
+
+All working backends should expose the same single-garage interface:
+
+```text
+GET  /garage/status
+POST /garage/open
+POST /garage/close
+```
+
+`Tahlor/broadlink` already prefers:
+
+1. `MYQ_LOCAL_URL` — direct opener/local emulator
+2. `MYQ_SUPERBOX_URL` — official-app bridge
+
+The direct-cloud provider is excluded by default and appears only when `MYQ_ENABLE_EXPERIMENTAL_CLOUD=1` is explicitly set.
+
+## Experimental direct-cloud code
+
+The repository retains current v6 endpoint/OAuth work under `src/myq_bridge/cloud.py` because it can still be useful as **protocol evidence** — for example, to correlate a known server-side command with opener-side TCP 8883 traffic.
+
+It is **not** the production plan. See issue #2.
+
+Do not spend substantial time bootstrapping OAuth unless a specific opener-side experiment needs it.
 
 ## Protocol-recovery tooling
 
@@ -97,8 +151,6 @@ python tools\lan_probe.py --subnet <home-subnet>
 python tools\pcap_summary.py capture.pcap --opener-ip <opener-ip>
 ```
 
-Current Chamberlain support documentation says myQ devices require outbound **TCP 8883** to communicate with MyQ servers. Because 8883 is conventionally MQTT-over-TLS, it is the highest-priority opener traffic to capture, but the port number alone is not treated as proof of MQTT.
-
 ## Safety / secrets
 
 A garage door is a physical access-control device. The project:
@@ -108,6 +160,16 @@ A garage door is a physical access-control device. The project:
 - serializes UI commands;
 - no-ops when an explicit requested state is already observed;
 - refuses a UI toggle when current state is unknown;
-- keeps credentials, rotating OAuth tokens, APKs, screenshots/UI dumps, pcaps and raw captures out of Git.
+- never fails over to another provider after an ambiguous mutating request;
+- keeps credentials, tokens, APKs, screenshots/UI dumps, pcaps and raw captures out of Git.
 
-See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`, and issues #1–#3 for live evidence gates.
+## Agent execution order
+
+See:
+
+- #1 — official-app/Superbox bridge
+- #5 — pairing/provisioning local service
+- #3 — normal-LAN + TCP 8883 characterization
+- #6 — local Chamberlain-service emulation
+- #2 — experimental direct-cloud evidence only
+- #4 — consolidated local-agent handoff

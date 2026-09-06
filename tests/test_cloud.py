@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import httpx
@@ -635,6 +636,43 @@ def test_cloud_command_endpoint_requires_action_specific_confirmation(monkeypatc
     assert response.status_code == 428
     assert response.json()["detail"] == "Set X-MyQ-Confirm: open to authorize this command"
     assert calls == []
+
+
+def test_cloud_command_endpoint_rejects_confirmation_for_different_action(monkeypatch):
+    class FakeClient:
+        def close(self):
+            pass
+
+        def door_command(self, *_args):
+            raise AssertionError("confirmation must be checked before the client call")
+
+    monkeypatch.setattr(cloud_cli, "_client", lambda: FakeClient())
+    app = cloud_cli.create_app("local-api-key-1234")
+
+    with TestClient(app) as web:
+        response = web.post(
+            "/accounts/acct-1/doors/door-1/open",
+            headers={
+                "X-API-Key": "local-api-key-1234",
+                "X-MyQ-Confirm": "close",
+            },
+        )
+
+    assert response.status_code == 428
+    assert response.json()["detail"] == "Set X-MyQ-Confirm: open to authorize this command"
+
+
+def test_cloud_cli_requires_confirmation_flag_before_loading_session(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["myq-cloud", "open", "acct-1", "door-1"],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cloud_cli.main()
+
+    assert exc_info.value.code == 2
 
 
 def test_cloud_preflight_endpoint_is_read_only(monkeypatch):

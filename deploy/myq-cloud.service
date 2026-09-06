@@ -1,5 +1,12 @@
+# EXPERIMENTAL ONLY — not the production Broadlink path.
+#
+# Community unofficial MyQ cloud integrations have repeatedly broken as
+# Chamberlain changed/blocked access. Keep this service only for protocol
+# experiments or explicitly validated short-lived tests. Production should use
+# the official-app Superbox bridge or a true-local/local-emulator backend.
+
 [Unit]
-Description=MyQ software gateway for Broadlink
+Description=EXPERIMENTAL MyQ direct-cloud gateway
 After=network-online.target
 Wants=network-online.target
 
@@ -16,8 +23,6 @@ Restart=on-failure
 RestartSec=5
 TimeoutStopSec=10
 
-# The service only needs normal network/filesystem access. Keep credentials in
-# the EnvironmentFile and rotating OAuth session in ignored config/.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full

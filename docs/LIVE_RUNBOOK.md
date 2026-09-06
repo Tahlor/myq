@@ -15,6 +15,8 @@ Follow issue #1 and `docs/APP_BRIDGE.md` until all are true:
 
 Do not enable experimental direct-cloud mode in Broadlink.
 
+If login/MFA needs user interaction, leave the app at that prompt and continue the read-only LAN/APK work below rather than blocking the whole session.
+
 ## 1. Identify the opener on the normal LAN
 
 From a host on the home LAN:
@@ -35,6 +37,8 @@ local listening ports
 ```
 
 Keep raw identifiers out of GitHub issue comments.
+
+Do not attempt DNS redirection until the opener is positively identified and its normal cloud hostname has been observed.
 
 ## 2. Mine the exact installed official APK
 
@@ -71,6 +75,8 @@ Highest-value facts to extract:
 - client certificate/keystore references;
 - BLE/Wi-Fi commissioning protocol clues.
 
+Only post sanitized protocol facts; keep the raw decompile output local/ignored.
+
 ## 3. Inspect the opener's supported setup portal
 
 Do not factory reset. Enter only the normal documented Wi-Fi learn/setup mode after preserving a reprovision path.
@@ -94,6 +100,8 @@ The tool performs GET requests only. It saves root HTML plus same-origin JS/CSS 
 Do **not** submit Wi-Fi credentials while doing the initial capture.
 
 Then return the opener to normal home Wi-Fi and test only the exact read-only paths/ports revealed by its own setup assets against the confirmed normal opener IP.
+
+If entering setup mode would erase current Wi-Fi configuration rather than merely expose the supported temporary AP, do not continue unless the reprovision path is known; continue normal-LAN/8883 work instead.
 
 ## 4. Capture opener → Chamberlain traffic
 
@@ -141,6 +149,8 @@ Interpretation:
 
 The listener does not complete TLS and sends no command.
 
+After proving or disproving E0, restore normal DNS before doing certificate/emulator design. Do not leave the opener offline unnecessarily.
+
 ## 6. TLS decision tree
 
 After E0:
@@ -156,6 +166,8 @@ Determine whether the opener's client credential is exportable software state or
 
 ### If TLS can legitimately be terminated
 Only then recover application semantics (MQTT or otherwise), build the minimum telemetry-only emulator, then test one explicit command.
+
+A self-signed certificate failure alone is **not** proof of pinning; ordinary CA validation produces the same result.
 
 ## 7. Broadlink integration target
 

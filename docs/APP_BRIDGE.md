@@ -109,7 +109,7 @@ The installer:
 - builds `android_bridge/app`;
 - installs `com.tahlor.myqbridge`;
 - stores the supplied/generated API key in the app's private preferences;
-- **appends** our accessibility service to Android's enabled service list rather than replacing existing services;
+- preserves the existing enabled service list and performs a verified accessibility rebind for our service;
 - enables accessibility globally if requested;
 - optionally pushes an already-calibrated `doors.json`;
 - prints the Superbox LAN API endpoint and secret.
@@ -125,6 +125,24 @@ The app-session restart check also passed on 2026-09-06: after force-stopping on
 The dashboard's large `device_view_progress_indicator` is a live action surface, not a safe navigation target. A calibration tap on 2026-09-06 produced a transient `Opening` UI state and then a `Garage Door is not responding` alert. The alert was dismissed without another device tap; two independent direct-cloud status reads and two subsequent bridge reads reported `closed` and `online=True`. The selector is intentionally not present in the state-only local configuration until an explicit action-control test is authorized and can be physically observed.
 
 If automatic accessibility enablement is undesirable for a test, pass `-NoEnableAccessibility` and enable **myQ LAN Bridge** manually in Android Accessibility settings.
+
+An APK update can leave the bridge component present in Android's enabled-service
+setting but detached from the accessibility manager. If `/status` returns `409`
+with `myQ LAN accessibility service is not connected` after an update, run the
+recovery helper and then bring the official dashboard to the foreground again:
+
+```powershell
+# Use -AdbPath only when adb is not already on PATH.
+.\scripts\rebind_bridge_accessibility.ps1 -AdbSerial $serial -AdbPath "C:\path\to\adb.exe" -UseRoot
+# Otherwise:
+.\scripts\rebind_bridge_accessibility.ps1 -AdbSerial $serial -UseRoot
+```
+
+The helper removes and re-adds only the bridge component, preserves the other
+enabled accessibility services, starts the visible bridge activity, and verifies
+the component is bound. `-UseRoot` repairs only Android's secure setting on the
+rooted Superbox; it does not change `ro.secure`, `ro.debuggable`, `su`, or the
+system image.
 
 ## Phase A3 — calibrate selectors
 

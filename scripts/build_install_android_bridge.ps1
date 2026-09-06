@@ -8,7 +8,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PackageName = "com.tahlor.myqbridge"
-$ServiceComponent = "com.tahlor.myqbridge/com.tahlor.myqbridge.BridgeAccessibilityService"
 
 if (-not $AdbSerial) {
     $AdbSerial = (& "$PSScriptRoot\connect_superbox.ps1" | Select-Object -Last 1).Trim()
@@ -41,21 +40,8 @@ if ($DoorConfigPath) {
 }
 
 if (-not $NoEnableAccessibility) {
-    $current = (& adb -s $AdbSerial shell settings get secure enabled_accessibility_services).Trim()
-    if ($current -eq "null") { $current = "" }
-    $services = @($current -split ':' | Where-Object { $_ })
-    if ($services -contains $ServiceComponent) {
-        # Reinstalling the package can leave the component listed but unbound.
-        # Remove and re-add it so Android's accessibility manager performs a fresh bind.
-        $withoutBridge = @($services | Where-Object { $_ -ne $ServiceComponent })
-        & adb -s $AdbSerial shell settings put secure enabled_accessibility_services ($withoutBridge -join ':')
-        Start-Sleep -Milliseconds 500
-        $services = $withoutBridge
-    }
-    $services += $ServiceComponent
-    $newValue = $services -join ':'
-    & adb -s $AdbSerial shell settings put secure enabled_accessibility_services $newValue
-    & adb -s $AdbSerial shell settings put secure accessibility_enabled 1
+    & "$PSScriptRoot\rebind_bridge_accessibility.ps1" -AdbSerial $AdbSerial -UseRoot
+    if ($LASTEXITCODE -ne 0) { throw "Failed to bind the bridge accessibility service" }
 }
 
 $route = (& adb -s $AdbSerial shell ip route get 1.1.1.1 2>$null) -join ' '

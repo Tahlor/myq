@@ -17,6 +17,7 @@ from myq_bridge.cloud import (
     DOOR_ACTION_URL,
     CloudSession,
     MyQAuthError,
+    MyQCloudError,
     MyQCloudClient,
     SessionStore,
 )
@@ -166,6 +167,192 @@ def test_device_and_explicit_action_paths_are_current_v6_shapes():
     ]
 
 
+def test_door_command_verifies_observed_state_before_and_after_action():
+    seen: list[tuple[str, str]] = []
+    states = iter(["closed", "open"])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url)))
+        if str(request.url) == ACCOUNTS_URL:
+            return httpx.Response(200, json={"accounts": [{"id": "acct"}]})
+        if str(request.url) == DEVICES_URL.format(account_id="acct"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "serial_number": "door-1",
+                            "device_family": "garagedoor",
+                            "state": {"door_state": next(states), "online": True},
+                        }
+                    ]
+                },
+            )
+        if str(request.url) == DOOR_ACTION_URL.format(
+            account_id="acct", door_opener_id="door-1", action="open"
+        ):
+            assert request.method == "PUT"
+            return httpx.Response(202)
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = client.door_command(
+            "acct", "door-1", "open", verify_timeout=1, poll_interval=0
+        )
+    finally:
+        client.close()
+
+    assert result == {
+        "ok": True,
+        "changed": True,
+        "action": "open",
+        "account_id": "acct",
+        "door_opener_id": "door-1",
+        "before": "closed",
+        "after": "open",
+    }
+    assert seen == [
+        ("GET", ACCOUNTS_URL),
+        ("GET", DEVICES_URL.format(account_id="acct")),
+        (
+            "PUT",
+            DOOR_ACTION_URL.format(
+                account_id="acct", door_opener_id="door-1", action="open"
+            ),
+        ),
+        ("GET", ACCOUNTS_URL),
+        ("GET", DEVICES_URL.format(account_id="acct")),
+    ]
+
+
+def test_door_command_noops_when_requested_state_is_already_observed():
+    seen: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url)))
+        if str(request.url) == ACCOUNTS_URL:
+            return httpx.Response(200, json={"accounts": [{"id": "acct"}]})
+        if str(request.url) == DEVICES_URL.format(account_id="acct"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "serial_number": "door-1",
+                            "device_family": "garagedoor",
+                            "state": {"door_state": "closed", "online": True},
+                        }
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected mutation: {request.method} {request.url}")
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = client.door_command(
+            "acct", "door-1", "close", verify_timeout=1, poll_interval=0
+        )
+    finally:
+        client.close()
+
+    assert result["ok"] is True
+    assert result["changed"] is False
+    assert result["before"] == result["after"] == "closed"
+    assert all(method == "GET" for method, _url in seen)
+
+
+def test_door_command_refuses_unknown_or_transitional_state_before_mutation():
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.method)
+        if str(request.url) == ACCOUNTS_URL:
+            return httpx.Response(200, json={"accounts": [{"id": "acct"}]})
+        if str(request.url) == DEVICES_URL.format(account_id="acct"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "serial_number": "door-1",
+                            "device_family": "garagedoor",
+                            "state": {"door_state": "opening", "online": True},
+                        }
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected mutation: {request.method} {request.url}")
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        with pytest.raises(MyQCloudError, match="Refusing close"):
+            client.door_command("acct", "door-1", "close")
+    finally:
+        client.close()
+
+    assert seen == ["GET", "GET"]
+
+
+def test_door_command_fails_closed_when_post_state_is_not_verified():
+    seen: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url)))
+        if str(request.url) == ACCOUNTS_URL:
+            return httpx.Response(200, json={"accounts": [{"id": "acct"}]})
+        if str(request.url) == DEVICES_URL.format(account_id="acct"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "serial_number": "door-1",
+                            "device_family": "garagedoor",
+                            "state": {"door_state": "closed", "online": True},
+                        }
+                    ]
+                },
+            )
+        if str(request.url) == DOOR_ACTION_URL.format(
+            account_id="acct", door_opener_id="door-1", action="open"
+        ):
+            return httpx.Response(202)
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        with pytest.raises(MyQCloudError, match="did not verify"):
+            client.door_command(
+                "acct", "door-1", "open", verify_timeout=0, poll_interval=0
+            )
+    finally:
+        client.close()
+
+    assert seen == [
+        ("GET", ACCOUNTS_URL),
+        ("GET", DEVICES_URL.format(account_id="acct")),
+        (
+            "PUT",
+            DOOR_ACTION_URL.format(
+                account_id="acct", door_opener_id="door-1", action="open"
+            ),
+        ),
+    ]
+
+
 def test_android_session_prefers_the_apk_device_route_and_headers():
     seen: list[tuple[str, str]] = []
 
@@ -306,3 +493,37 @@ def test_account_scoped_cloud_status_endpoint(monkeypatch):
         "account_id": "acct-1",
         "doors": [{"account_id": "acct-1", "door_state": "closed"}],
     }
+
+
+def test_cloud_command_endpoint_uses_verified_command_result(monkeypatch):
+    calls: list[tuple[str, str, str]] = []
+
+    class FakeClient:
+        def close(self):
+            pass
+
+        def door_command(self, account_id, door_opener_id, action):
+            calls.append((account_id, door_opener_id, action))
+            return {
+                "ok": True,
+                "changed": True,
+                "action": action,
+                "account_id": account_id,
+                "door_opener_id": door_opener_id,
+                "before": "open",
+                "after": "closed",
+            }
+
+    monkeypatch.setattr(cloud_cli, "_client", lambda: FakeClient())
+    app = cloud_cli.create_app("local-api-key-1234")
+
+    with TestClient(app) as web:
+        response = web.post(
+            "/accounts/acct-1/doors/door-1/close",
+            headers={"X-API-Key": "local-api-key-1234"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["before"] == "open"
+    assert response.json()["after"] == "closed"
+    assert calls == [("acct-1", "door-1", "close")]

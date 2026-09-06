@@ -36,7 +36,7 @@ $env:MYQ_API_KEY = '<local-secret>'
 myq-cloud serve   # default port 8766
 ```
 
-The direct REST facade exposes explicit open/close operations only; it does not use a toggle. Read-only status is available globally at `GET /status` and for a single account at `GET /accounts/{account_id}/status`.
+The direct REST facade exposes explicit open/close operations only; it does not use a toggle. Read-only status is available globally at `GET /status` and for a single account at `GET /accounts/{account_id}/status`. The action endpoints first read the named door and refuse an unknown, transitional, or offline state; they send at most one action and return success only after a fresh status read verifies the requested state. Same-state requests are verified no-ops, and an unverified post-action state is reported as an error.
 
 The clean-room client refreshes and retries an expired session for read-only HTTP requests. It deliberately does **not** replay a mutating `open`, `close`, or lock-mode request after a `401`; the caller must re-authenticate and make a fresh, explicit request after verifying state.
 

@@ -85,17 +85,15 @@ def create_app(api_key: str) -> FastAPI:
         "/accounts/{account_id}/doors/{door_opener_id}/open",
         dependencies=[protected],
     )
-    def open_door(account_id: str, door_opener_id: str) -> dict[str, bool]:
-        translate(lambda: client.door_action(account_id, door_opener_id, "open"))
-        return {"ok": True}
+    def open_door(account_id: str, door_opener_id: str) -> dict[str, Any]:
+        return translate(lambda: client.door_command(account_id, door_opener_id, "open"))
 
     @app.post(
         "/accounts/{account_id}/doors/{door_opener_id}/close",
         dependencies=[protected],
     )
-    def close_door(account_id: str, door_opener_id: str) -> dict[str, bool]:
-        translate(lambda: client.door_action(account_id, door_opener_id, "close"))
-        return {"ok": True}
+    def close_door(account_id: str, door_opener_id: str) -> dict[str, Any]:
+        return translate(lambda: client.door_command(account_id, door_opener_id, "close"))
 
     @app.post(
         "/accounts/{account_id}/doors/{door_opener_id}/remotes/{state}",
@@ -153,8 +151,7 @@ def main() -> None:
         elif args.command == "devices":
             _dump(client.devices(args.account_id))
         elif args.command in {"open", "close"}:
-            client.door_action(args.account_id, args.door_opener_id, args.command)
-            _dump({"ok": True, "action": args.command})
+            _dump(client.door_command(args.account_id, args.door_opener_id, args.command))
         else:
             parser.error(f"Unknown command {args.command}")
 

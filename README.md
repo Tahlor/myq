@@ -28,7 +28,7 @@ Current defaults are configurable but start from the working August 2026 client 
 
 This is important because the observed refresh and door-command flow does **not** require Play Integrity/App Check fields. The first authorized Android session has now been bootstrapped locally and validated through the read-only client. Do not commit tokens.
 
-The 2026-09-06 live validation refreshed the Android-issued session, discovered one account with a garage door and hub, and read the door as closed and online. No mutating endpoint was called.
+The 2026-09-06 live validation refreshed the Android-issued session, discovered one account with a garage door and hub, and returned the door as closed and online on two consecutive read-only status calls. No mutating endpoint was called.
 
 Once a local authorized session exists in ignored `config/cloud_session.json` (copy `config/cloud_session.example.json`), the direct client can:
 
@@ -55,7 +55,7 @@ myq-cloud accounts
 
 The extractor writes only the ignored session file and reports presence/absence; it does not print access or refresh tokens.
 
-The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle. It remains an experimental direct-cloud path until session durability and command behavior are revalidated.
+The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle. Each action caller first reads the named door, refuses an unknown, transitional, or offline state, sends at most one action, and returns success only after a fresh read verifies the requested state. A same-state request is a verified no-op; an unverified post-action state is an error. It remains an experimental direct-cloud path until session durability and live command behavior are revalidated.
 
 ## Official-app / Superbox bridge
 

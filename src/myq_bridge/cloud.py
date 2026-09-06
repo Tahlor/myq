@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
@@ -296,6 +297,14 @@ class MyQCloudClient:
         return doors
 
     def door_action(self, account_id: str, door_opener_id: str, action: str) -> None:
+        """Send one raw explicit action.
+
+        Callers that can affect a real opener should use :meth:`door_command`,
+        which performs the observed-state and post-action verification gate.
+        This lower-level method remains separate so protocol tests can assert
+        the exact mutating request without accidentally adding a second
+        command or replaying one after an ambiguous response.
+        """
         if action not in {"open", "close"}:
             raise ValueError("action must be 'open' or 'close'")
         response = self.request(
@@ -310,6 +319,109 @@ class MyQCloudClient:
         )
         if response.status_code not in (200, 202):
             self._raise(response, f"{action} door")
+
+    def door_command(
+        self,
+        account_id: str,
+        door_opener_id: str,
+        action: str,
+        *,
+        verify_timeout: float = 12.0,
+        poll_interval: float = 0.75,
+    ) -> dict[str, Any]:
+        """Safely perform one explicit door action and verify the resulting state.
+
+        The command is never sent when the current state is missing, in
+        transition, offline, or already equal to the requested state. A
+        successful return means the cloud status read observed the requested
+        state after the action; failure after the PUT is intentionally
+        reported as an error instead of claiming success.
+        """
+        if action not in {"open", "close"}:
+            raise ValueError("action must be 'open' or 'close'")
+        if verify_timeout < 0:
+            raise ValueError("verify_timeout must be non-negative")
+        if poll_interval < 0:
+            raise ValueError("poll_interval must be non-negative")
+
+        desired = "open" if action == "open" else "closed"
+        before_door = self._find_door(account_id, door_opener_id)
+        if before_door is None:
+            raise MyQCloudError(
+                f"Refusing {action}: door {door_opener_id!r} was not found in status"
+            )
+
+        before = self._state_value(before_door)
+        if before == desired:
+            return self._command_result(
+                account_id, door_opener_id, action, before, before, changed=False
+            )
+        if before not in {"open", "closed"}:
+            raise MyQCloudError(
+                f"Refusing {action}: current state for {door_opener_id!r} is {before!r}"
+            )
+        if before_door.get("online") is False:
+            raise MyQCloudError(
+                f"Refusing {action}: door {door_opener_id!r} is offline"
+            )
+
+        self.door_action(account_id, door_opener_id, action)
+        after = before
+        deadline = time.monotonic() + verify_timeout
+        while time.monotonic() < deadline:
+            if poll_interval:
+                time.sleep(min(poll_interval, max(0.0, deadline - time.monotonic())))
+            after_door = self._find_door(account_id, door_opener_id)
+            after = self._state_value(after_door) if after_door is not None else "unknown"
+            if after == desired:
+                return self._command_result(
+                    account_id, door_opener_id, action, before, after, changed=True
+                )
+
+        raise MyQCloudError(
+            f"MyQ {action} request was sent but state did not verify "
+            f"(before={before!r}, after={after!r})"
+        )
+
+    def _find_door(self, account_id: str, door_opener_id: str) -> dict[str, Any] | None:
+        wanted = str(door_opener_id)
+        return next(
+            (
+                door
+                for door in self.door_status(account_id)
+                if str(door.get("door_opener_id") or "") == wanted
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _state_value(door: dict[str, Any] | None) -> str:
+        if door is None:
+            return "unknown"
+        value = door.get("door_state")
+        if value is None:
+            return "unknown"
+        return str(value).strip().lower().replace("_", " ") or "unknown"
+
+    @staticmethod
+    def _command_result(
+        account_id: str,
+        door_opener_id: str,
+        action: str,
+        before: str,
+        after: str,
+        *,
+        changed: bool,
+    ) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "changed": changed,
+            "action": action,
+            "account_id": account_id,
+            "door_opener_id": door_opener_id,
+            "before": before,
+            "after": after,
+        }
 
     def set_lock_mode(
         self, account_id: str, door_opener_id: str, enabled: bool

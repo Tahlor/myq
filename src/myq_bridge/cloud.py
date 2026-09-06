@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
 import time
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -149,6 +150,7 @@ class MyQCloudClient:
         self.session = session
         self.on_session_updated = on_session_updated
         self._client = httpx.Client(transport=transport, timeout=timeout, follow_redirects=True)
+        self._command_lock = threading.Lock()
 
     def close(self) -> None:
         self._client.close()
@@ -321,6 +323,25 @@ class MyQCloudClient:
             self._raise(response, f"{action} door")
 
     def door_command(
+        self,
+        account_id: str,
+        door_opener_id: str,
+        action: str,
+        *,
+        verify_timeout: float = 12.0,
+        poll_interval: float = 0.75,
+    ) -> dict[str, Any]:
+        """Serialize and safely perform one explicit door action."""
+        with self._command_lock:
+            return self._door_command(
+                account_id,
+                door_opener_id,
+                action,
+                verify_timeout=verify_timeout,
+                poll_interval=poll_interval,
+            )
+
+    def _door_command(
         self,
         account_id: str,
         door_opener_id: str,

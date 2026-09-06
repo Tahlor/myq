@@ -97,6 +97,18 @@ class BridgeAccessibilityService : AccessibilityService() {
             if (desired == null && after != before && after != "unknown") break
         }
 
+        val verified = if (desired != null) {
+            after == desired
+        } else {
+            after != before && after != "unknown"
+        }
+        if (!verified) {
+            throw IllegalStateException(
+                "Requested $action for ${door.name} was not verified " +
+                    "(before=$before, after=$after)"
+            )
+        }
+
         JSONObject()
             .put("ok", true)
             .put("changed", true)
@@ -221,6 +233,7 @@ class BridgeAccessibilityService : AccessibilityService() {
 
     companion object {
         const val MYQ_PACKAGE = "com.chamberlain.android.liftmaster.myq"
+        const val MYQ_DASHBOARD_ACTIVITY = "com.chamberlain.myq.main.HomeTabsActivity"
         private const val MAX_DEBUG_NODES = 500
         private val STATE_MAP = linkedMapOf(
             "opening" to "opening",

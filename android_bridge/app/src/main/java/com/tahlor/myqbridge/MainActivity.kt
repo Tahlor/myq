@@ -55,8 +55,11 @@ class MainActivity : Activity() {
         container.addView(Button(this).apply {
             text = "Open myQ"
             setOnClickListener {
-                val launch = packageManager.getLaunchIntentForPackage(BridgeAccessibilityService.MYQ_PACKAGE)
-                if (launch != null) startActivity(launch)
+                val launch = Intent().setClassName(
+                    BridgeAccessibilityService.MYQ_PACKAGE,
+                    BridgeAccessibilityService.MYQ_DASHBOARD_ACTIVITY,
+                )
+                startActivity(launch)
             }
         })
         setContentView(container)

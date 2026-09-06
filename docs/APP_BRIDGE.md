@@ -118,6 +118,10 @@ The foreground host service keeps the HTTP port available while myQ hands off to
 
 The service does not bring myQ to the foreground on behalf of a LAN request. Use the companion activity's **Open myQ** action (or an already-running myQ task), verify the dashboard, and then call `/status` or `/debug/nodes`.
 
+On 2026-09-06, the user-facing launcher path was narrowed to the official APK's exported `com.chamberlain.myq.main.HomeTabsActivity`. A cold explicit launch of that dashboard activity completed in 2.487 seconds and remained foreground without the `LoginActivity` focus-loss ANR. The package launcher still takes the Splash/Login path that reproduces the ANR, so this dashboard shortcut is the current bridge validation path. After rebinding the service and closing the first-run tour, the native bridge observed 42 dashboard nodes and two consecutive `GET /status` reads returned one configured `Garage Door` as `closed`.
+
+The dashboard's large `device_view_progress_indicator` is a live action surface, not a safe navigation target. A calibration tap on 2026-09-06 produced a transient `Opening` UI state and then a `Garage Door is not responding` alert. The alert was dismissed without another device tap; two independent direct-cloud status reads and two subsequent bridge reads reported `closed` and `online=True`. The selector is intentionally not present in the state-only local configuration until an explicit action-control test is authorized and can be physically observed.
+
 If automatic accessibility enablement is undesirable for a test, pass `-NoEnableAccessibility` and enable **myQ LAN Bridge** manually in Android Accessibility settings.
 
 ## Phase A3 — calibrate selectors

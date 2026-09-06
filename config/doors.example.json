@@ -3,13 +3,11 @@
     {
       "name": "Garage Door",
       "state": {
-        "resource_id": "REPLACE_AFTER_DEBUG_TREE"
+        "resource_id": "com.chamberlain.android.liftmaster.myq:id/device_state"
       },
       "open": null,
       "close": null,
-      "toggle": {
-        "resource_id": "REPLACE_AFTER_DEBUG_TREE"
-      }
+      "toggle": null
     }
   ]
 }

@@ -6,9 +6,9 @@ Software-only integration work for Chamberlain/LiftMaster myQ devices. The goal 
 
 We are pursuing three software layers in parallel, ordered from easiest to most independent:
 
-1. **Official-app bridge (working code, foreground-app validation pending)**
+1. **Official-app bridge (dashboard read validated; action validation pending)**
    `Home automation -> Superbox:8765 -> official myQ Android app -> myQ cloud -> opener`
-2. **Direct-cloud bridge (implemented, authorized read-only session validated 2026-09-06)**
+2. **Direct-cloud bridge (implemented, repeatable read-only session validated 2026-09-06)**
    `Home automation -> local daemon:8766 -> myQ v6 cloud -> opener`
 3. **True local control (protocol-recovery track)**
    `Home automation -> opener on LAN`, ideally with no Chamberlain cloud.
@@ -89,7 +89,7 @@ Invoke-RestMethod http://<superbox-ip>:8765/debug/nodes -Headers $headers
 Invoke-RestMethod http://<superbox-ip>:8765/status -Headers $headers
 ```
 
-The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. It never launches myQ from the LAN server: the user-facing activity must bring myQ to the foreground before UI reads or commands. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
+The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. It never launches myQ from the LAN server: the user-facing activity brings the app's dashboard activity to the foreground before UI reads or commands. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
 
 ## Protocol-recovery tooling
 

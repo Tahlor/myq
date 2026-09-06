@@ -30,11 +30,48 @@ def _dump(value: Any) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
 
 
+def select_door(
+    doors: list[dict[str, Any]],
+    *,
+    door_id: str | None = None,
+    door_name: str | None = None,
+) -> dict[str, Any]:
+    """Select the configured garage door without leaking MyQ IDs upstream.
+
+    Selection order is explicit id, explicit case-insensitive name, then the only
+    discovered door. Multiple unconfigured doors are deliberately ambiguous.
+    """
+    if door_id:
+        matches = [door for door in doors if str(door.get("door_opener_id") or "") == door_id]
+        if len(matches) == 1:
+            return matches[0]
+        raise ValueError("Configured MYQ_DOOR_ID did not match exactly one garage door")
+
+    if door_name:
+        wanted = door_name.strip().casefold()
+        matches = [
+            door
+            for door in doors
+            if str(door.get("name") or "").strip().casefold() == wanted
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        raise ValueError("Configured MYQ_DOOR_NAME did not match exactly one garage door")
+
+    if len(doors) == 1:
+        return doors[0]
+    if not doors:
+        raise ValueError("No garage doors were discovered for this MyQ account")
+    raise ValueError(
+        "Multiple garage doors discovered; set MYQ_DOOR_ID or MYQ_DOOR_NAME"
+    )
+
+
 def create_app(api_key: str) -> FastAPI:
     if len(api_key) < 16:
         raise RuntimeError("MYQ_API_KEY must be at least 16 characters")
 
-    app = FastAPI(title="myQ direct cloud bridge", version="0.1.0")
+    app = FastAPI(title="myQ direct cloud bridge", version="0.2.0")
     client = _client()
 
     def auth(x_api_key: str | None = Header(default=None)) -> None:
@@ -61,9 +98,65 @@ def create_app(api_key: str) -> FastAPI:
         except MyQCloudError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    def configured_door() -> dict[str, Any]:
+        doors = translate(client.door_status)
+        try:
+            return select_door(
+                doors,
+                door_id=os.environ.get("MYQ_DOOR_ID"),
+                door_name=os.environ.get("MYQ_DOOR_NAME"),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     @app.get("/status", dependencies=[protected])
     def status() -> dict[str, Any]:
         return {"backend": "direct-cloud", "doors": translate(client.door_status)}
+
+    @app.get("/garage/status", dependencies=[protected])
+    def garage_status() -> dict[str, Any]:
+        door = configured_door()
+        return {
+            "backend": "direct-cloud",
+            "name": door.get("name") or "Garage Door",
+            "state": door.get("door_state"),
+            "online": door.get("online"),
+            "last_update": door.get("last_update"),
+        }
+
+    def garage_action(action: str) -> dict[str, Any]:
+        door = configured_door()
+        state = str(door.get("door_state") or "").strip().lower()
+        if state == action:
+            return {
+                "ok": True,
+                "changed": False,
+                "action": action,
+                "state": state,
+                "backend": "direct-cloud",
+            }
+        if door.get("online") is False:
+            raise HTTPException(status_code=503, detail="Configured garage door is offline")
+        account_id = str(door.get("account_id") or "")
+        opener_id = str(door.get("door_opener_id") or "")
+        if not account_id or not opener_id:
+            raise HTTPException(status_code=503, detail="Garage door identifiers are unavailable")
+        translate(lambda: client.door_action(account_id, opener_id, action))
+        return {
+            "ok": True,
+            "changed": True,
+            "action": action,
+            "previous_state": state or None,
+            "backend": "direct-cloud",
+        }
+
+    @app.post("/garage/open", dependencies=[protected])
+    def open_garage() -> dict[str, Any]:
+        return garage_action("open")
+
+    @app.post("/garage/close", dependencies=[protected])
+    def close_garage() -> dict[str, Any]:
+        return garage_action("close")
 
     @app.get("/accounts", dependencies=[protected])
     def accounts() -> list[dict[str, Any]]:

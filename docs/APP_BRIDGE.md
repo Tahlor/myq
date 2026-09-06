@@ -144,6 +144,18 @@ the component is bound. `-UseRoot` repairs only Android's secure setting on the
 rooted Superbox; it does not change `ro.secure`, `ro.debuggable`, `su`, or the
 system image.
 
+## Live post-update recovery validation — 2026-09-06
+
+The final guarded APK was installed over the existing bridge without clearing
+its private key or door configuration. As expected on this Superbox firmware,
+the host initially needed an app-process restart and the accessibility service
+needed rebinding. A mutating request sent without `X-MyQ-Confirm: open` returned
+HTTP `428` before touching the myQ service. The recovery helper then reported the
+service enabled and bound; after the official dashboard was restored to the
+foreground, authenticated bridge status and direct-cloud status each reported
+one configured door as `closed` and online. No open, close, toggle, or reboot was
+issued during this recovery validation.
+
 ## Phase A3 — calibrate selectors
 
 Before any command, inspect the dashboard hierarchy through the native bridge:

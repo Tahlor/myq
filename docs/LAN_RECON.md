@@ -6,6 +6,33 @@ Determine whether the existing myQ Wi-Fi opener can be controlled by software on
 
 This is a protocol-recovery problem, not an assumption that a friendly HTTP API already exists.
 
+## Highest-value direct-device lead: setup/pairing web service
+
+MyQ's supported Wi-Fi setup flow proves that at least some openers expose a temporary local Wi-Fi AP such as `myQ-XXX` and serve a setup site at `setup.myqdevice.com` while the phone/laptop is directly connected to the opener. That makes the provisioning service our first direct-device reverse-engineering target before attempting complicated TLS interception.
+
+Relevant setup documentation/examples:
+
+- Chamberlain/LiftMaster manuals instruct the user to enter Wi-Fi learn mode, connect to the network with the `MyQ-` prefix, and browse to `setup.myqdevice.com`.
+- Current third-party installation instructions still describe the same setup path.
+
+The important unknown is whether this local service is only a Wi-Fi provisioning UI or whether its HTML/JavaScript/API exposes useful device metadata, state, or command primitives. A second key question is whether the same service/endpoints remain reachable at the opener's normal home-LAN IP after provisioning.
+
+**Do not enter setup mode casually.** It can interrupt normal MyQ connectivity and some flows offer destructive actions such as erasing Wi-Fi configuration. Preserve the current working state and a normal reprovisioning path first.
+
+See issue #5 for the executable workflow. The sequence is intentionally:
+
+1. establish a reliable production Broadlink path first (or run this in parallel with another agent);
+2. enter normal supported setup mode;
+3. connect a disposable client to `myQ-*`;
+4. resolve/capture `setup.myqdevice.com`;
+5. fetch only the shipped HTML/JS/assets and let those reveal endpoints;
+6. observe non-mutating UI requests such as Wi-Fi scan/device info;
+7. return the opener to home Wi-Fi;
+8. test the **exact discovered endpoints** against its confirmed normal LAN IP;
+9. only test a garage command if the shipped service explicitly reveals such a primitive and the door is physically observed.
+
+If the setup service exposes status on the normal LAN, that is Level 1 immediately. If it exposes explicit open/close commands on the normal LAN, that is Level 2 and should be wrapped behind the project's stable `/garage/status`, `/garage/open`, `/garage/close` contract.
+
 ## Known network lead: TCP 8883
 
 Current Chamberlain support documentation explicitly says **myQ devices use TCP port 8883 to communicate with myQ servers** and may appear offline when that port is blocked:
@@ -13,7 +40,7 @@ Current Chamberlain support documentation explicitly says **myQ devices use TCP 
 - https://support.chamberlaingroup.com/s/article/Recommended-router-settings-for-the-MyQ-Wi-Fi-products-1484145723404
 - https://support.chamberlaingroup.com/s/article/When-to-Contact-Your-Internet-Service-Provider-ISP
 
-TCP 8883 is conventionally MQTT over TLS, so outbound 8883 traffic is our highest-priority capture target. Do **not** treat the port number alone as proof that a given connection speaks MQTT; confirm from current live traffic and/or firmware/app evidence.
+TCP 8883 is conventionally MQTT over TLS, so outbound 8883 traffic is our highest-priority cloud-protocol capture target. Do **not** treat the port number alone as proof that a given connection speaks MQTT; confirm from current live traffic and/or firmware/app evidence.
 
 This also makes a useful identification experiment: once the opener IP is confirmed, an outbound connection from that host to TCP 8883 is strong supporting evidence that we have the right device. Blocking it is not required for discovery and should not be the first test.
 
@@ -52,6 +79,8 @@ For the confirmed opener IP:
 5. record MAC, IP, firmware/model information only in ignored local capture files unless a sanitized model-level fact is useful to the project.
 
 If a stable local service appears, map it before doing any traffic interception.
+
+If issue #5 has already revealed setup-mode endpoints, test those exact paths/ports against the normal LAN IP before broad scanning. Preserve the `Host: setup.myqdevice.com` header if the setup UI used host-based routing.
 
 ## Phase B2.3 — observe outbound cloud traffic
 
@@ -123,3 +152,4 @@ The opener can be redirected from Chamberlain to our own local MQTT/API service 
 - Do not desolder/debug the opener board.
 - Do not buy/install a ratgdo as a workaround; that defeats this project's stated objective.
 - Do not spend time brute-forcing arbitrary LAN ports if live traffic immediately proves the device is outbound-only.
+- Do not erase Wi-Fi settings merely to inspect the setup UI; capture read-only setup behavior first.

@@ -81,6 +81,15 @@ def create_app(api_key: str) -> FastAPI:
     def devices(account_id: str) -> list[dict[str, Any]]:
         return translate(lambda: client.devices(account_id))
 
+    @app.get(
+        "/accounts/{account_id}/doors/{door_opener_id}/preflight/{action}",
+        dependencies=[protected],
+    )
+    def preflight(account_id: str, door_opener_id: str, action: str) -> dict[str, Any]:
+        if action not in {"open", "close"}:
+            raise HTTPException(status_code=400, detail="action must be open or close")
+        return translate(lambda: client.door_preflight(account_id, door_opener_id, action))
+
     @app.post(
         "/accounts/{account_id}/doors/{door_opener_id}/open",
         dependencies=[protected],
@@ -124,6 +133,13 @@ def main() -> None:
     devices = sub.add_parser("devices", help="List devices for an account")
     devices.add_argument("account_id")
 
+    preflight = sub.add_parser(
+        "preflight", help="Read a door and report whether an explicit action is safe"
+    )
+    preflight.add_argument("account_id")
+    preflight.add_argument("door_opener_id")
+    preflight.add_argument("action", choices=("open", "close"))
+
     for action in ("open", "close"):
         command = sub.add_parser(action, help=f"{action.title()} a door explicitly")
         command.add_argument("account_id")
@@ -150,6 +166,8 @@ def main() -> None:
             _dump(client.door_status())
         elif args.command == "devices":
             _dump(client.devices(args.account_id))
+        elif args.command == "preflight":
+            _dump(client.door_preflight(args.account_id, args.door_opener_id, args.action))
         elif args.command in {"open", "close"}:
             _dump(client.door_command(args.account_id, args.door_opener_id, args.command))
         else:

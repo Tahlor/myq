@@ -229,6 +229,51 @@ def test_door_command_verifies_observed_state_before_and_after_action():
     ]
 
 
+def test_door_preflight_is_read_only_and_reports_action_plan():
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.method)
+        if str(request.url) == ACCOUNTS_URL:
+            return httpx.Response(200, json={"accounts": [{"id": "acct"}]})
+        if str(request.url) == DEVICES_URL.format(account_id="acct"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "serial_number": "door-1",
+                            "device_family": "garagedoor",
+                            "state": {"door_state": "closed", "online": True},
+                        }
+                    ]
+                },
+            )
+        raise AssertionError(f"Unexpected mutation: {request.method} {request.url}")
+
+    client = MyQCloudClient(
+        CloudSession("access", "refresh"),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        plan = client.door_preflight("acct", "door-1", "open")
+    finally:
+        client.close()
+
+    assert plan == {
+        "ready": True,
+        "changed": True,
+        "action": "open",
+        "account_id": "acct",
+        "door_opener_id": "door-1",
+        "before": "closed",
+        "desired": "open",
+        "online": True,
+        "reason": None,
+    }
+    assert seen == ["GET", "GET"]
+
+
 def test_door_command_noops_when_requested_state_is_already_observed():
     seen: list[tuple[str, str]] = []
 
@@ -527,3 +572,38 @@ def test_cloud_command_endpoint_uses_verified_command_result(monkeypatch):
     assert response.json()["before"] == "open"
     assert response.json()["after"] == "closed"
     assert calls == [("acct-1", "door-1", "close")]
+
+
+def test_cloud_preflight_endpoint_is_read_only(monkeypatch):
+    calls: list[tuple[str, str, str]] = []
+
+    class FakeClient:
+        def close(self):
+            pass
+
+        def door_preflight(self, account_id, door_opener_id, action):
+            calls.append((account_id, door_opener_id, action))
+            return {
+                "ready": True,
+                "changed": True,
+                "action": action,
+                "account_id": account_id,
+                "door_opener_id": door_opener_id,
+                "before": "closed",
+                "desired": "open",
+                "online": True,
+                "reason": None,
+            }
+
+    monkeypatch.setattr(cloud_cli, "_client", lambda: FakeClient())
+    app = cloud_cli.create_app("local-api-key-1234")
+
+    with TestClient(app) as web:
+        response = web.get(
+            "/accounts/acct-1/doors/door-1/preflight/open",
+            headers={"X-API-Key": "local-api-key-1234"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["ready"] is True
+    assert calls == [("acct-1", "door-1", "open")]

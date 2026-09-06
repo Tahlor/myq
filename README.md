@@ -40,6 +40,9 @@ myq-cloud refresh
 myq-cloud accounts
 myq-cloud devices <account-id>
 
+# Read-only action preflight; inspect this before any explicit command.
+myq-cloud preflight <account-id> <door-opener-id> open
+
 # Run a local authenticated REST facade on port 8766.
 $env:MYQ_API_KEY = '<local-secret>'
 myq-cloud serve

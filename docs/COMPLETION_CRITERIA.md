@@ -13,7 +13,7 @@ The project is complete only when it has a trustworthy, software-only path for t
 ## Current status — 2026-09-06
 
 - Direct-cloud read: two consecutive owner-authorized status reads each returned one door as `closed` and `online`; no mutating endpoint was called.
-- Direct-cloud command: the client and REST/CLI callers now enforce serialized before-state and after-state verification in tests; no live mutating request has been made.
+- Direct-cloud command: the client and REST/CLI callers now expose a read-only preflight and enforce serialized before-state and after-state verification in tests; no live mutating request has been made.
 - Official-app bridge: the dashboard shortcut is stable, the bridge reads `Garage Door: closed` twice, and background navigation is guarded. The package launcher still reproduces a `LoginActivity` focus-loss ANR, and the dashboard's live action surface needs an explicitly authorized test.
 - LAN track: current evidence confirms an outbound TCP/8883 session for the probable device, but no local status or command protocol is proven.
 

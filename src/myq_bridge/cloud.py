@@ -341,6 +341,39 @@ class MyQCloudClient:
                 poll_interval=poll_interval,
             )
 
+    def door_preflight(
+        self, account_id: str, door_opener_id: str, action: str
+    ) -> dict[str, Any]:
+        """Read the named door and report whether an action is safe to send."""
+        if action not in {"open", "close"}:
+            raise ValueError("action must be 'open' or 'close'")
+
+        desired = "open" if action == "open" else "closed"
+        door = self._find_door(account_id, door_opener_id)
+        if door is None:
+            raise MyQCloudError(
+                f"Refusing {action}: door {door_opener_id!r} was not found in status"
+            )
+
+        before = self._state_value(door)
+        reason = None
+        if before not in {"open", "closed"}:
+            reason = f"current state is {before!r}"
+        elif door.get("online") is False:
+            reason = "door is offline"
+
+        return {
+            "ready": reason is None,
+            "changed": before != desired,
+            "action": action,
+            "account_id": account_id,
+            "door_opener_id": door_opener_id,
+            "before": before,
+            "desired": desired,
+            "online": door.get("online"),
+            "reason": reason,
+        }
+
     def _door_command(
         self,
         account_id: str,
@@ -365,25 +398,14 @@ class MyQCloudClient:
         if poll_interval < 0:
             raise ValueError("poll_interval must be non-negative")
 
-        desired = "open" if action == "open" else "closed"
-        before_door = self._find_door(account_id, door_opener_id)
-        if before_door is None:
-            raise MyQCloudError(
-                f"Refusing {action}: door {door_opener_id!r} was not found in status"
-            )
-
-        before = self._state_value(before_door)
-        if before == desired:
+        plan = self.door_preflight(account_id, door_opener_id, action)
+        before = str(plan["before"])
+        desired = str(plan["desired"])
+        if not plan["ready"]:
+            raise MyQCloudError(f"Refusing {action}: {plan['reason']}")
+        if not plan["changed"]:
             return self._command_result(
                 account_id, door_opener_id, action, before, before, changed=False
-            )
-        if before not in {"open", "closed"}:
-            raise MyQCloudError(
-                f"Refusing {action}: current state for {door_opener_id!r} is {before!r}"
-            )
-        if before_door.get("online") is False:
-            raise MyQCloudError(
-                f"Refusing {action}: door {door_opener_id!r} is offline"
             )
 
         self.door_action(account_id, door_opener_id, action)

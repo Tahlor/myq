@@ -6,7 +6,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 import myq_bridge.cloud_cli as cloud_cli
 from myq_bridge.cloud import (
@@ -22,6 +21,7 @@ from myq_bridge.cloud import (
     MyQCloudClient,
     SessionStore,
 )
+from myq_bridge.cloud_cli import select_door
 
 
 def test_refresh_rotates_and_persists_session(tmp_path: Path):
@@ -537,6 +537,30 @@ def test_door_status_normalizes_only_garage_devices():
         ]
     finally:
         client.close()
+
+
+def test_select_door_uses_only_door_without_configuration():
+    door = {"door_opener_id": "one", "name": "Main Garage"}
+    assert select_door([door]) is door
+
+
+def test_select_door_requires_configuration_when_multiple_doors_exist():
+    doors = [
+        {"door_opener_id": "one", "name": "Main Garage"},
+        {"door_opener_id": "two", "name": "Shop"},
+    ]
+    with pytest.raises(ValueError, match="Multiple garage doors"):
+        select_door(doors)
+    assert select_door(doors, door_name="main garage") is doors[0]
+    assert select_door(doors, door_id="two") is doors[1]
+
+
+def test_select_door_rejects_stale_configuration():
+    doors = [{"door_opener_id": "one", "name": "Main Garage"}]
+    with pytest.raises(ValueError, match="MYQ_DOOR_ID"):
+        select_door(doors, door_id="missing")
+    with pytest.raises(ValueError, match="MYQ_DOOR_NAME"):
+        select_door(doors, door_name="Missing Garage")
 
 
 def test_session_store_accepts_legacy_jwt_key(tmp_path: Path):

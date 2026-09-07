@@ -12,6 +12,10 @@ live evidence from **2026 or later** that it works against the owner's current
 account and opener. A successful import, old GitHub issue, or historical
 endpoint does not qualify.
 
+The full operational rule is in
+[`docs/PYMYQ_DEPRECATION.md`](docs/PYMYQ_DEPRECATION.md). Read it before
+opening or accepting any garage-related task.
+
 ## Architecture and priority
 
 We are pursuing three software layers, with production and research separated deliberately:

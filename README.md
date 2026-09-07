@@ -2,18 +2,34 @@
 
 Software-only integration work for Chamberlain/LiftMaster myQ devices. The goal is reliable home-automation control **without adding hardware to the garage opener**.
 
+## 🚨 HARD STOP: `pymyq` is COMPLETELY DEPRECATED
+
+This is a stop sign, not a TODO: we should **NEVER EVER** install `pymyq`,
+debug it, pin it, update it, revive it, use it as a fallback, or spend time
+adapting its historical endpoints. It is not a supported implementation or
+research target. Reopen that decision only if someone produces reproducible
+live evidence from **2026 or later** that it works against the owner's current
+account and opener. A successful import, old GitHub issue, or historical
+endpoint does not qualify. Until then, all work belongs in the current
+clean-room direct-cloud client, the official Android bridge, or the true-LAN
+protocol track.
+
 ## Architecture
 
 We are pursuing three software layers in parallel, ordered from easiest to most independent:
 
-1. **Official-app bridge (dashboard read validated; action validation pending)**
+1. **Official-app bridge (bootstrap/recovery fallback)**
    `Home automation -> Superbox:8765 -> official myQ Android app -> myQ cloud -> opener`
-2. **Direct-cloud bridge (implemented, repeatable read-only session validated 2026-09-06)**
-   `Home automation -> local daemon:8766 -> myQ v6 cloud -> opener`
+2. **Direct-cloud bridge (primary background path; live read and command validated 2026-09-06)**
+   `Home automation -> Broadlink/Pi3 -> myQ v6 cloud -> opener`
 3. **True local control (protocol-recovery track)**
    `Home automation -> opener on LAN`, ideally with no Chamberlain cloud.
 
-The first two are complementary: the official app can remain a compatibility/bootstrap fallback even if direct cloud calls become the normal path. Per the current cloud handoff, direct cloud is still experimental protocol/diagnostic tooling; the Superbox bridge remains the production-priority fallback.
+The first two are complementary: the official app supplies the one-time/recovery
+OAuth session, while the direct-cloud client is the normal background path. The
+native Superbox bridge remains installed as a compatibility and recovery
+fallback; its UI-backed endpoints still require the official dashboard in the
+foreground.
 
 ## Current 2026 direct-cloud finding
 
@@ -28,7 +44,7 @@ Current defaults are configurable but start from the working August 2026 client 
 
 This is important because the observed refresh and door-command flow does **not** require Play Integrity/App Check fields. The first authorized Android session has now been bootstrapped locally and validated through the read-only client. Do not commit tokens.
 
-The 2026-09-06 live validation refreshed the Android-issued session, discovered one account with a garage door and hub, and returned the door as closed and online on two consecutive read-only status calls. No mutating endpoint was called.
+The 2026-09-06 live validation refreshed the Android-issued session, discovered one account with a garage door and hub, and returned the door as closed and online on two consecutive read-only status calls. A later explicitly authorized direct-cloud `open` was sent once after a fresh closed/online preflight and verified open through the myQ sensor; no retry or toggle was issued.
 
 Once a local authorized session exists in ignored `config/cloud_session.json` (copy `config/cloud_session.example.json`), the direct client can:
 
@@ -61,7 +77,7 @@ myq-cloud accounts
 
 The extractor writes only the ignored session file and reports presence/absence; it does not print access or refresh tokens.
 
-The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle. Mutating REST calls must also include `X-MyQ-Confirm: open` or `X-MyQ-Confirm: close` matching the endpoint. Each action caller first reads the named door, refuses an unknown, transitional, or offline state, sends at most one action, and returns success only after a fresh read verifies the requested state. A same-state request is a verified no-op; an unverified post-action state is an error. It remains an experimental direct-cloud path until session durability and live command behavior are revalidated.
+The REST service exposes authenticated account/device discovery and **explicit** open/close endpoints; it never uses a blind toggle. Mutating REST calls must also include `X-MyQ-Confirm: open` or `X-MyQ-Confirm: close` matching the endpoint. Each action caller first reads the named door, refuses an unknown, transitional, or offline state, sends at most one action, and returns success only after a fresh read verifies the requested state. A same-state request is a verified no-op; an unverified post-action state is an error. The direct-cloud protocol is now the validated background path; session rotation and recovery remain operational concerns, not reasons to return to pymyq.
 
 ## Official-app / Superbox bridge
 

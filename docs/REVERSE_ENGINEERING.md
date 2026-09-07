@@ -1,5 +1,15 @@
 # Track B1 — app/cloud protocol recovery
 
+## Non-negotiable implementation policy
+
+`pymyq` is **COMPLETELY DEPRECATED** for this project. This is a stop sign, not
+a TODO: we should **NEVER EVER** install it, debug it, pin it, revive it, or use
+it as a fallback. Historical `pymyq` behavior is not current evidence and must
+not drive implementation decisions. The only exception is reproducible live
+evidence dated **2026 or later** that it works against the owner's current
+account and opener. Otherwise use the clean-room client in `src/myq_bridge/`,
+the direct-cloud integration in Broadlink, or the official Android fallback.
+
 ## Goal
 
 Use the official Android app as an oracle, then replace UI automation with our own clean client wherever the current protocol permits it.
@@ -19,7 +29,7 @@ A new public Home Assistant integration, `vector-sec/chamberlain-myq-hacs`, was 
 
 This is stronger than the old 2023 API evidence. We therefore clean-room implemented the current protocol facts in `src/myq_bridge/cloud.py` and `src/myq_bridge/cloud_cli.py`. Do not copy/vendor the external implementation; its repository currently has no license file.
 
-The remaining B1 gate was **initial authorized-session bootstrap**. Once an authorized access/refresh-token pair is available locally, our client can rotate it and persist the new pair atomically in ignored `config/cloud_session.json`. The current cloud handoff keeps this path experimental and diagnostic; the Superbox bridge remains the production-priority fallback while session durability and command behavior are established.
+The remaining B1 gate was **initial authorized-session bootstrap**. That gate is now passed: on 2026-09-06, an owner-authorized session supported a live read and one explicitly authorized, sensor-verified direct-cloud open. The direct client is now the normal background path; the Superbox bridge is the bootstrap/recovery fallback while session durability and full-reboot persistence remain operational follow-up.
 
 On 2026-09-04, before the authorized bootstrap, this checkout had no local session file and no token environment variables, so live refresh/account validation was intentionally blocked. No token material was requested or recorded at that checkpoint; the result is superseded by the authorized validation below.
 

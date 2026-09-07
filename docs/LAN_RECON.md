@@ -167,6 +167,16 @@ This is decisive for the emulator decision. The opener is not waiting for a norm
 
 The reusable `tools/tls_transparent_probe.py` implements this safety boundary: it relays TLS handshake records for observation but never forwards application-data records. Raw relay output and network identifiers remain ignored local artifacts.
 
+## Related firmware/NVM lead — 2026-09-07
+
+The public [MyQ-ESP-transplant firmware-research repository](https://github.com/fuxxociety/MyQ-ESP-transplant) contains two identical 8 MiB SPI-flash dumps, Marvell 88MW30x firmware headers, extracted images, a decompile note, and MCU communication notes. It is a related historical image, not a dump of the owner's current `MYQ-G0401` firmware `1.10`: the visible model table includes older `MYQ-G0301`/`MYQ-G0303` entries, and no exact current-version match was found.
+
+The dump nevertheless answers the key storage question. Its PSM data contains a `myq_aes` record with a 16-byte value. The firmware code has matching `nvm_rd_myq_aes_key_encrypted` and `nvm_rd_myq_aes_key` routines. The latter unwraps two little-endian 8-byte blocks with a 32-round TEA variant and a fixed 16-byte binary code literal immediately before the `mac_addr`/`myq_sn` labels; the decrypt path cycles the four key words in reverse round order. The result is a device-specific 16-byte key. The repository now includes `tools/myq_firmware_psm.py`, which reproduces that unwrap in memory and emits only record metadata and hashes. No key bytes from the public dump are stored here or logged.
+
+This is stronger than a hostname or cipher-suite hint, but it does not recover the owner's key: the value is per-device, and the public image is not version/model matched to the current unit. The current normal-LAN read-only probe also returned `404` for the related `/sys/diag/info`, `/sys/connection`, `/sys/services`, `/sys/prov_status`, `/sys/interface`, `/sys`, and `/sys/firmware` paths; it exposed no firmware/NVM export surface. No setup/reset transition, firmware update, `/sys/command` request, BLE pairing, or garage command was attempted.
+
+The direct-device track therefore has a precise next gate: obtain an exact current-device firmware/NVM image through a supported software-accessible export or a separately approved forensic acquisition, then run the offline parser against it. Until that evidence exists, the live TLS transcript and cloud API cannot derive the PSK, and a local broker cannot be built safely. Preserve the official-app bridge and do not turn the public historical key into a credential guess for the owner's device.
+
 ## Superbox capture-tool check — 2026-09-05
 
 The rooted Superbox was checked as a possible short-term observation point. Its system `toybox` is present, but the image exposes no `tcpdump`, `tshark`, or `netcat` command. No capture binary was installed and no interception or traffic mutation was attempted. A router/AP capture, managed-switch mirror, or another already-approved observation point is still needed to classify the opener's outbound protocol.

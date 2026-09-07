@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import struct
 
+from tools.myq_firmware_psm import (
+    find_psm_record,
+    unwrap_myq_aes,
+)
 from tools.setup_portal_capture import extract_endpoint_candidates, same_origin_asset
 from tools.tls_clienthello_listener import parse_client_hello
 from tools.tls_transparent_probe import RecordBuffer, summarize_record
@@ -104,3 +108,26 @@ def test_transparent_probe_reports_psk_identity_length_without_identity():
     summary = summarize_record(record, "client_to_server")
     assert summary["handshake_types"] == [16]
     assert summary["client_psk_identity_length"] == 10
+
+
+def test_firmware_psm_finds_named_myq_aes_record_without_value_logging():
+    value = bytes(range(16))
+    record = (
+        b"\x55\xAA\xFF"
+        + b"\x00\x00\x00\x00"
+        + b"\x10\x00\x03\x00\x07"
+        + b"myq_aes"
+        + value
+    )
+    parsed = find_psm_record(b"prefix" + record + b"\xFF" * 8, "myq_aes")
+    assert parsed is not None
+    assert parsed.record_type == 0x10
+    assert parsed.index == 3
+    assert parsed.value == value
+
+
+def test_firmware_psm_unwrap_matches_disassembled_tea_vector():
+    # Synthetic vector for plaintext b"0123456789ABCDEF"; it contains no
+    # device-derived material.
+    wrapped = bytes.fromhex("12f31c46782c932eac4eed494287225f")
+    assert unwrap_myq_aes(wrapped) == b"0123456789ABCDEF"

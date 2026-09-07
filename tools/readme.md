@@ -56,6 +56,19 @@ that rule immediately after the observation. The current MYQ-G0401 evidence
 shows a PSK-based TLS handshake, so this tool is an observation aid rather than
 a local broker implementation.
 
+## `myq_firmware_psm.py`
+Offline, secret-safe triage for a firmware/SPI-flash dump. It locates the
+related firmware's `myq_aes` PSM record, reproduces the observed 32-round
+four-word TEA unwrap, and prints metadata plus hashes only—never the key bytes:
+
+```bash
+python tools/myq_firmware_psm.py captures/firmware.bin
+```
+
+Keep the raw dump under ignored `captures/`. The unwrap constant is from the
+related historical image, so re-validate the model/version and code literal
+before treating an output as evidence about another device.
+
 ## `summarize_jadx.py`
 Static triage of the exact installed official MyQ APK after JADX decompilation. Prioritizes opener-local provisioning, network, MQTT/cloud, TLS/pinning, Wi-Fi and BLE clues.
 

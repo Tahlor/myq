@@ -121,6 +121,52 @@ The Windows host's active Ethernet interface is on the private `192.168.187.0/24
 
 The router-side read-only conntrack check still reported one matching TCP/8883 entry for the prior candidate. This confirms current outbound-port evidence but still provides no payload, TLS SNI, or MQTT framing. No local listener was identified, and no network, opener, DNS, firewall, or forwarding state was changed.
 
+## Current model confirmation and BLE boundary — 2026-09-07
+
+A read-only `GET /jabout` against the already correlated normal-LAN candidate returned `200` and identified the device at model level as:
+
+- manufacturer: Chamberlain Group;
+- brand: Chamberlain;
+- product: `SMART GARAGE CONTROL,GEN3,BLE,CH`;
+- model: `MYQ-G0401`;
+- firmware: `1.10`;
+- Internet connection: reported as connected.
+
+The raw response contains serial, MAC and network identifiers, which remain only in ignored local captures. No Wi-Fi/configuration endpoint and no garage action was called. This is now positive model/firmware evidence for the current device, not just a hostname/OUI inference.
+
+The exact current Android APK independently maps the `CHUB` peripheral to the following BLE surface:
+
+| BLE element | UUID | Observed role |
+| --- | --- | --- |
+| service | `26d91a37-c279-4d0f-96a1-532ce41ce0f6` | Smart Garage Control commissioning service |
+| write characteristic | `2c9aeec6-05fc-4204-974c-49541cce2b42` | NUL-terminated setup commands/responses |
+| notify characteristic | `ad9dd28e-6bc9-42cd-a5c7-d8717d8a0c96` | setup status and notifications |
+| device-information service | `0000180a-0000-1000-8000-00805f9b34fb` | standard metadata reads |
+
+For this `CHUB` implementation, the app sends `about\0` and `scan_results\0`, reads standard device-information characteristics, and constructs `config_save?...` for Wi-Fi provisioning. The latter is a credential/configuration mutation and was not used. The code contains no normal open/close/toggle command on this model-specific BLE path; the separate encrypted BLE command code belongs to the app's Lockitron smart-lock peripheral.
+
+A temporary unfiltered, read-only BLE advertisement scan on the SuperBOX ran for 20 seconds and saw unrelated nearby devices but no MyQ name and no `CHUB` service advertisement. The scanner was removed afterward. This means the current opener is not advertising the commissioning service in its present normal state; entering a supported provisioning state would be required to inspect it over BLE, and that would interrupt the currently working setup. No pairing, GATT connection, characteristic write, or physical setup-mode transition was performed.
+
+The direct-device track therefore remains **L0 for local control**: the normal-LAN port-80 surface is setup/metadata only, and the model-specific BLE surface proven from the current APK is commissioning/metadata only. The live outbound TCP/8883 session is the highest-value path for recovering device-side command transport, but its application payload remains encrypted and unobserved. A short router/AP or managed-switch passive capture is still useful for proving the opener's DNS resolution; the controlled server result below means a certificate-only redirect is no longer a promising next step.
+
+## Live TLS/PSK boundary — 2026-09-07
+
+A short series of reversible router redirects was used only after the candidate device, gateway and existing 8883 flow were confirmed. The rules matched the candidate source address and TCP destination port `8883`, forwarded to a temporary listener on the Pi3, and were removed after each run. No Wi-Fi/configuration endpoint, TLS application record, MQTT command, or garage action was sent. The final run used the current endpoint lead `connect.myqdevice.com` as the relay's explicit upstream; because the router performs the rewrite before Pi3 sees the connection, the relay did not infer a hostname from `SO_ORIGINAL_DST`.
+
+The opener's live handshake is now characterized:
+
+- ClientHello: TLS 1.2 (`3.3`), record version `3.1`, no SNI, no ALPN;
+- offered cipher suites: `0x008c` and `0x00ff`;
+- IANA identifies `0x008c` as `TLS_PSK_WITH_AES_128_CBC_SHA`; `0x00ff` is the TLS renegotiation signaling value;
+- the real server selected `0x008c`, sent `ServerHello` and `ServerHelloDone`, and accepted the client's PSK handshake;
+- the client's 16-byte ClientKeyExchange record is consistent with a 10-byte PSK identity plus the TLS handshake header and length field; the identity itself was not logged;
+- both sides completed change-cipher-spec/Finished, and the server sent a NewSessionTicket;
+- the relay terminated at the handshake boundary and blocked TLS content type `23` (application data), so MQTT framing and any device command were not observed or forwarded.
+
+This is decisive for the emulator decision. The opener is not waiting for a normal CA-signed certificate that a local server could simply replace. It authenticates the 8883 peer with a pre-shared key and uses a device-side identity; a usable local replacement would need the per-device PSK and the encrypted application protocol (likely MQTT, but MQTT remains unconfirmed until an application record is safely captured). A fake certificate, DNS spoof alone, or a generic local MQTT broker is insufficient. The next software-only work item is therefore credential/protocol recovery from supported provisioning or firmware evidence; do not brute-force the PSK or enter setup/reset mode merely to obtain it.
+
+The reusable `tools/tls_transparent_probe.py` implements this safety boundary: it relays TLS handshake records for observation but never forwards application-data records. Raw relay output and network identifiers remain ignored local artifacts.
+
 ## Superbox capture-tool check — 2026-09-05
 
 The rooted Superbox was checked as a possible short-term observation point. Its system `toybox` is present, but the image exposes no `tcpdump`, `tshark`, or `netcat` command. No capture binary was installed and no interception or traffic mutation was attempted. A router/AP capture, managed-switch mirror, or another already-approved observation point is still needed to classify the opener's outbound protocol.

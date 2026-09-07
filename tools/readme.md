@@ -40,6 +40,22 @@ sudo python tools/tls_clienthello_listener.py --bind 0.0.0.0 --port 8883
 
 It records only initial TLS metadata such as SNI/ALPN/cipher counts and does not complete TLS or send an application command.
 
+## `tls_transparent_probe.py`
+Handshake-only relay for a controlled, already-authorized redirect when the
+opener's upstream endpoint is known. It forwards TLS handshake records to the
+real upstream, logs record/cipher metadata, and blocks application-data records
+in both directions. It does not terminate TLS or inject a command:
+
+```bash
+python tools/tls_transparent_probe.py --bind 0.0.0.0 --port 8883 \
+  --upstream-host connect.myqdevice.com --upstream-port 8883 --once
+```
+
+Use only with a temporary router rule scoped to the confirmed opener and remove
+that rule immediately after the observation. The current MYQ-G0401 evidence
+shows a PSK-based TLS handshake, so this tool is an observation aid rather than
+a local broker implementation.
+
 ## `summarize_jadx.py`
 Static triage of the exact installed official MyQ APK after JADX decompilation. Prioritizes opener-local provisioning, network, MQTT/cloud, TLS/pinning, Wi-Fi and BLE clues.
 

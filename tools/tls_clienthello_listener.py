@@ -36,6 +36,7 @@ class ClientHelloSummary:
     sni: str | None = None
     alpn: list[str] | None = None
     cipher_count: int | None = None
+    cipher_suites: list[str] | None = None
     extension_types: list[int] | None = None
     parse_error: str | None = None
 
@@ -81,6 +82,11 @@ def parse_client_hello(data: bytes, peer: tuple[str, int] = ("unknown", 0)) -> C
         cipher_len = struct.unpack("!H", hello[pos : pos + 2])[0]
         pos += 2
         summary.cipher_count = cipher_len // 2
+        summary.cipher_suites = [
+            f"0x{int.from_bytes(hello[offset : offset + 2], 'big'):04x}"
+            for offset in range(pos, pos + cipher_len, 2)
+            if offset + 2 <= len(hello)
+        ]
         pos += cipher_len
 
         if pos >= len(hello):

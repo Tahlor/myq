@@ -101,6 +101,13 @@ sudo python tools/tls_clienthello_listener.py --bind 0.0.0.0 --port 8883
 
 Temporarily redirect only the discovered opener hostname to that host. The listener records the opener's initial TLS ClientHello metadata (SNI, ALPN, cipher/extension counts) and sends no application command. A connection establishes emulator milestone E0: the opener follows our redirect. Issue #6 contains the TLS/protocol/emulator decision tree.
 
+The current MYQ-G0401 goes further than E0: its live TLS 1.2 handshake offers
+only `TLS_PSK_WITH_AES_128_CBC_SHA` (`0x008c`) plus the renegotiation signaling
+value, with no SNI or ALPN. `tools/tls_transparent_probe.py` can relay only the
+handshake to a known upstream and blocks application-data records. This proves
+that a local replacement needs the device's PSK and encrypted application
+protocol; a fake certificate or generic MQTT listener is not enough.
+
 ## Installed-APK static analysis
 
 Pull and decompile the **exact installed official app** before guessing about pairing or broker behavior:

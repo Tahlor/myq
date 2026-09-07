@@ -12,9 +12,10 @@ The project is complete only when it has a trustworthy, software-only path for t
 
 ## Current status — 2026-09-06
 
-- Direct-cloud read: two consecutive owner-authorized status reads each returned one door as `closed` and `online`; no mutating endpoint was called.
-- Direct-cloud command: the client and REST/CLI callers now expose a read-only preflight, require action-specific confirmation at mutating boundaries, and enforce serialized before-state and after-state verification in tests. A temporary loopback REST service also passed authenticated `/health`, `/status`, and `/preflight/open` checks with `closed → open` readiness; no live mutating request has been made.
-- Official-app bridge: the dashboard shortcut is stable across an app-process restart, the bridge reads `Garage Door: closed` twice after restart, and background navigation is guarded. The package launcher still reproduces a `LoginActivity` focus-loss ANR, and the dashboard's live action surface needs an explicitly authorized test; full Superbox reboot persistence remains pending.
+- Direct-cloud read: two consecutive owner-authorized status reads returned one door as `closed` and `online` before the command. A fresh authenticated read after the command returned `open` and `online`; no credentials or account/device identifiers were exposed.
+- Direct-cloud command: the client and REST/CLI callers expose a read-only preflight, require action-specific confirmation at mutating boundaries, and enforce serialized before-state and after-state verification in tests. With explicit owner authorization, exactly one guarded `open` was sent after the sensor reported stable `closed`/online; the command result was `closed → open` with `changed=True`, and no retry or toggle was issued.
+- Official-app bridge: the dashboard shortcut is stable across an app-process restart, background navigation is guarded, and the native bridge independently reported `Garage Door: open` and online after the cloud command. The package launcher still reproduces a `LoginActivity` focus-loss ANR, but the explicit exported dashboard activity is the documented foreground fallback; full Superbox reboot persistence remains pending.
 - LAN track: current evidence confirms an outbound TCP/8883 session for the probable device, but no local status or command protocol is proven.
+- Handoff: the sanitized test suite passes (`33 passed`), the accessibility rebind helper was live-tested while preserving existing services, and sensitive runtime artifacts remain ignored.
 
-The goal remains active until the read and command gates pass on the real account and the remaining handoff gates are satisfied.
+All required gates for this software-only milestone now pass. Full-device-reboot persistence, the package-launcher ANR, and direct LAN protocol recovery remain non-blocking follow-up work.

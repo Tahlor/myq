@@ -156,6 +156,25 @@ foreground, authenticated bridge status and direct-cloud status each reported
 one configured door as `closed` and online. No open, close, toggle, or reboot was
 issued during this recovery validation.
 
+## Live sensor-verified command validation — 2026-09-06
+
+After the recovery validation, the owner explicitly authorized one `open` test
+and confirmed that the myQ sensor was the authoritative verification source; no
+visual confirmation was required. Fresh direct-cloud and native-bridge reads
+agreed that the door was `closed` and online, and direct-cloud preflight reported
+that `open` was ready to send.
+
+The guarded direct-cloud CLI then sent exactly one `open` request. Its normalized
+result was `changed=True`, with a verified `closed → open` transition. It did not
+retry, toggle, or issue a second command. Fresh post-command reads from both the
+direct cloud and the native Android bridge reported `open`; the cloud remained
+online, and the bridge remained online with one configured door.
+
+This closes the real-account read and command gates for the software-only
+milestone. The native bridge's live circular action selector remains intentionally
+unconfigured after the earlier calibration tap demonstrated that it is a live
+control surface; the direct-cloud path is the current verified command path.
+
 ## Phase A3 — calibrate selectors
 
 Before any command, inspect the dashboard hierarchy through the native bridge:
@@ -228,7 +247,7 @@ Then use Track B1 to recover the current cloud calls. If authenticated requests 
 - Does its login WebView work with the Superbox's current WebView, or does WebView need an update?
 - Does the app reject the Superbox's exposed `su` binary?
 - Which dashboard action selector can be tested safely? The state selector `com.chamberlain.android.liftmaster.myq:id/device_state` is stable in the current build; the live circular control remains intentionally unconfigured.
-- Can the direct-cloud preflight path complete one explicitly authorized action with physical observation and post-state verification?
+- Can the direct-cloud path complete one explicitly authorized action with sensor-based post-state verification? **Resolved 2026-09-06:** one guarded `open` completed with `closed → open` verification and no retry.
 - Does the native service remain bound and its TCP server recover after Superbox reboot?
 - Does the authenticated MyQ session remain usable through a full Superbox reboot? App-process restart is now verified.
 - Can a newer myQ APK reuse a session created by the older build without a new Integrity check?

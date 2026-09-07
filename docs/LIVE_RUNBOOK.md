@@ -1,186 +1,170 @@
 # Live MyQ runbook
 
-This is the shortest hands-on sequence for the local agent. The objective is to keep a working 2026 control path while recovering an opener-local protocol.
+This is the hands-on execution order for the local agent. **Do not restart a general audit.** Preserve the working software path and execute the highest-value remaining live experiment.
 
-## 🚨 HARD STOP: do not return to `pymyq`
+The current hardware/RF research plan is `docs/G0401_HARDWARE_RF_PLAN.md`; issue #7 is the live execution ticket; issue #4 is the current cross-track handoff/index.
 
-`pymyq` is **COMPLETELY DEPRECATED**. We should **NEVER EVER** install it,
-debug it, revive it, or use it as a fallback. Reconsider it only if
-reproducible live evidence from **2026 or later** proves it works against the
-owner's current account and opener. Historical code, old issues, and imports
-do not qualify. Follow the official-app, true-local, or explicitly experimental
-direct-cloud paths documented below.
+## 🚨 Hard stops that still apply
 
-## 0. Working baseline first: official app bridge
+- `pymyq` is completely deprecated. Do not install/debug/revive it.
+- Direct-cloud code is experimental evidence/oracle tooling, not the normal Broadlink backend.
+- Do not factory-reset the G0401 merely to inspect it.
+- Do not brute-force the TLS PSK.
+- Do not blind-replay unknown/rolling-code RF.
+- Do not use SWD/debug “unlock,” mass erase, option-byte/eFuse writes or firmware flashing merely to inspect the device.
+- Raw credentials, device IDs, firmware/NVM, RF captures and UART logs stay local/ignored until sanitized.
 
-Follow issue #1 and `docs/APP_BRIDGE.md` until all are true:
+## 0. Preserve a working baseline
 
-- official MyQ app is authenticated on the Superbox;
-- the real garage is visible;
-- native bridge `/status` matches the physical door;
-- Broadlink can reach the bridge;
-- one already-satisfied explicit command is a no-op;
-- one physically observed explicit transition succeeds.
-
-Do not enable experimental direct-cloud mode in Broadlink.
-
-If login/MFA needs user interaction, leave the app at that prompt and continue the read-only LAN/APK work below rather than blocking the whole session.
-
-## 1. Identify the opener on the normal LAN
-
-From a host on the home LAN:
-
-```bash
-python tools/lan_probe.py --subnet 192.168.187.0/24
-```
-
-Positive identification needs more than ping/hostname. Use MAC/OUI plus router association and, if needed, a controlled opener Wi-Fi reconnect.
-
-Record locally:
+The practical production/fallback route remains:
 
 ```text
-opener IP
-opener MAC
-model/firmware if known
-local listening ports
+Broadlink -> Superbox native bridge -> official myQ Android app -> Chamberlain -> G0401
 ```
 
-Keep raw identifiers out of GitHub issue comments.
+Before and after a hardware session, confirm a read-only status path still works. If the official-app bridge has a specific persistence/reboot bug, handle it in #1, but do not let routine bridge work consume the true-local research session once the baseline is usable.
 
-Do not attempt DNS redirection until the opener is positively identified and its normal cloud hostname has been observed.
+The experimental direct-cloud tooling has already completed one guarded real `closed -> open` transition and may be used as a controlled event source for passive RF/internal-bus correlation. It is not promoted to production merely because that one test worked.
 
-## 2. Mine the exact installed official APK
+## 1. Do not redo the already-resolved LAN/BLE/TLS audit
 
-On the authorized Superbox:
+Already established on the owner's unit:
 
-```powershell
-$serial = .\scripts\connect_superbox.ps1
-$dir = .\scripts\pull_myq_apks.ps1 -AdbSerial $serial
-.\scripts\decompile_myq.ps1 -ApkDirectory $dir
-```
+- `MYQ-G0401`, firmware `1.10` via local `/jabout`;
+- local TCP 80 setup/metadata surface, no local garage-action endpoint found;
+- current-app `CHUB` BLE implementation is commissioning/metadata oriented;
+- outbound TCP/8883 proven;
+- TLS 1.2 PSK with `TLS_PSK_WITH_AES_128_CBC_SHA`, no SNI/ALPN;
+- fake certificate/DNS-only/generic-MQTT cloud replacement is therefore insufficient;
+- historical related MyQ firmware proves useful per-device cryptographic material can reside in NVM, but it is not a current G0401 firmware dump.
 
-Then run:
+Use `docs/LAN_RECON.md` for evidence. Revisit these surfaces only when a new firmware/log/static-analysis fact gives a concrete new endpoint or hypothesis.
 
-```bash
-python tools/summarize_jadx.py <jadx-output>
-```
+## 2. First missing fact: identify the actual ceiling-mounted opener
 
-Read `myq-static-summary.json` in this order:
+The G0401 is a universal RF remote/gateway and supports multiple opener families. Before interpreting RF, record locally:
 
-1. `setup_portal`
-2. `local_network`
-3. `mqtt`
-4. `iot_cloud`
-5. `tls_cert`
-6. `wifi` / `ble`
+- ceiling opener manufacturer + full model;
+- approximate manufacture date;
+- Learn-button color;
+- handheld remote model/FCC ID if trivial;
+- G0402 sensor model/FCC ID.
 
-Highest-value facts to extract:
+Do not change pairing. Post sanitized model/protocol/frequency hypotheses only.
 
-- `setup.myqdevice.com` or other setup hostnames;
-- literal local API paths;
-- broker/cloud hostnames;
-- 8883/MQTT client library evidence;
-- certificate pinning/trust-manager code;
-- client certificate/keystore references;
-- BLE/Wi-Fi commissioning protocol clues.
+## 3. Passive RF if receiver equipment is available
 
-Only post sanitized protocol facts; keep the raw decompile output local/ignored.
+Follow #7 / `docs/G0401_HARDWARE_RF_PLAN.md`.
 
-## 3. Inspect the opener's supported setup portal
+### G0402 state path
 
-Do not factory reset. Enter only the normal documented Wi-Fi learn/setup mode after preserving a reprovision path.
+FCC evidence places the door sensor around 311.885 / 312.507 / 313.126 MHz with OOK modulation. Capture idle plus one state transition each direction. Recover carrier, timing, burst structure and fields correlated with open/closed if possible.
 
-When `myQ-*` appears, connect a disposable laptop/client and record its gateway/DNS configuration.
+### G0401 -> opener path
 
-First try:
+Use the actual ceiling-opener model to choose the band. Capture one known G0401 action and, if available, one corresponding handheld-remote action. Compare modulation/timing and changing fields. **Do not transmit/replay yet.**
 
-```bash
-python tools/setup_portal_capture.py http://setup.myqdevice.com/
-```
+No SDR? Continue to board/UART work immediately.
 
-If DNS fails but the setup gateway IP is known:
+## 4. Map the G0401 board before active probing
 
-```bash
-python tools/setup_portal_capture.py http://<SETUP-GATEWAY-IP>/ --host-header setup.myqdevice.com
-```
+Public FCC `HBW9545` photos and the Fn-Link `6220N-IS` module datasheet give us concrete landmarks.
 
-The tool performs GET requests only. It saves root HTML plus same-origin JS/CSS and prints candidate endpoint strings from the shipped code.
+With G0401 power disconnected:
 
-Do **not** submit Wi-Fi credentials while doing the initial capture.
+1. photograph both PCB sides and board revision;
+2. confirm the `6220N-IS` module orientation;
+3. compare to FCC internal photos;
+4. continuity-map accessible test pads/header pins to the module, prioritizing:
+   - GND;
+   - pin 32 `UART_LOG_TXD`, pin 31 `UART_LOG_RXD`;
+   - pins 63/64 communication UART RX/TX;
+   - pins 54/55 SWDIO/SWCLK;
+   - pins 35/36 I2C.
 
-Then return the opener to normal home Wi-Fi and test only the exact read-only paths/ports revealed by its own setup assets against the confirmed normal opener IP.
+Do not remove the module shield just to do this mapping.
 
-If entering setup mode would erase current Wi-Fi configuration rather than merely expose the supported temporary AP, do not continue unless the reprovision path is known; continue normal-LAN/8883 work instead.
+## 5. Highest-value live test: passive internal UART/bus capture
 
-## 4. Capture opener → Chamberlain traffic
+**Listen only first. Do not connect a USB-TTL TX lead to the board.** Verify logic voltage before attaching any analyzer.
 
-Preferred source is the router/AP, scoped to the opener IP/MAC. Capture:
+### Log UART
 
-1. idle/reconnect baseline;
-2. official app status refresh;
-3. one wall-button state change;
-4. at most one official-app explicit state command while physically observed.
+Capture `UART_LOG_TXD` from cold boot; try 115200 bps first. Correlate separate windows for boot, Wi-Fi association, idle, `/jabout`, app status refresh and one controlled action if authorized.
 
-Summarize:
+Useful output includes firmware/build/partition information, OTA host/path, broker/NVM/RF task names and diagnostic-shell clues.
 
-```bash
-python tools/pcap_summary.py captures/opener.pcap --opener-ip <OPENER-IP>
-```
+### Communication UART
 
-We need:
+If module pins 63/64 route off-module, capture both directions simultaneously while generating bounded known events.
 
-- DNS hostname(s);
-- destination IP/port;
-- whether TCP 8883 is really present;
-- TLS SNI/ALPN/certificate metadata;
-- connection/reconnect cadence.
+Correlation windows:
 
-Do not label it MQTT merely because the destination port is 8883.
+1. boot;
+2. idle;
+3. G0402/manual sensor transition;
+4. status refresh;
+5. exactly one explicit G0401 garage action.
 
-## 5. First cloud-emulation experiment: DNS redirect to passive listener
+**Priority discovery:** a repeatable frame appears on this bus immediately before the G0401 transmits RF / the garage moves.
 
-Only after the real opener hostname is known.
+If that happens, stop lower-value exploration and characterize the frame/bus. The preferred end state is to invoke this already-paired RF subsystem locally rather than reimplement rolling code.
 
-On a LAN host reachable by the opener:
+## 6. Read-only SWD after pad/voltage mapping
 
-```bash
-sudo python tools/tls_clienthello_listener.py --bind 0.0.0.0 --port 8883
-```
+The 6220N-IS exposes SWD, but RTL8720CS also supports debug protection.
 
-Temporarily override **only the discovered Chamberlain hostname** in the DNS path used by the opener so it resolves to this listener host. Keep rollback ready.
+First probe only:
 
-Interpretation:
+- identify chip/core;
+- query protection state;
+- read a small region if permitted;
+- if stable, acquire firmware/NVM and require repeated-read hash agreement.
 
-- no connection: opener may ignore DNS/cache/hard-code address, or redirect path is wrong;
-- connection but non-TLS: inspect protocol bytes separately;
-- TLS ClientHello with expected SNI: DNS redirect works — cloud emulator milestone E0;
-- ClientHello ALPN/cipher data gives the next TLS experiment.
+If the debugger offers only destructive unlock/recover, stop and report it. Do not change eFuse/security state.
 
-The listener does not complete TLS and sends no command.
+## 7. Pursue exact current firmware in parallel
 
-After proving or disproving E0, restore normal DNS before doing certificate/emulator design. Do not leave the opener offline unnecessarily.
+Best acquisition order:
 
-## 6. TLS decision tree
+1. read-only SWD/software path;
+2. natural OTA/update package capture;
+3. safe external SPI-flash read with G0401 unpowered;
+4. isolation/desoldering only later with explicit approval;
+5. Realtek ROM/UART boot mode only after pin mapping/backups/recovery are understood.
 
-After E0:
+The public module datasheet lists an 8 MiB SPI NOR inside the 6220N-IS module. A physical dump may still be encrypted if Chamberlain enabled RTL8720CS flash protection, so it is not the first move.
 
-### If normal certificate validation appears likely
-We cannot impersonate Chamberlain merely with a self-signed certificate. Determine whether the opener has a vendor CA/pinning model or whether commissioning provides any trust mechanism.
+Search an exact current G0401 firmware image for:
 
-### If certificate pinning is evident
-Static analysis/firmware work becomes necessary before transparent emulation.
+- internal UART/I2C/SPI protocol;
+- RF protocol/frequency tables and command constructors;
+- G0402 sensor parser;
+- setup/diagnostic/manufacturing commands;
+- OTA path/version/image format;
+- NVM/PSK identity/key-wrap logic;
+- MQTT/broker strings.
 
-### If mTLS/client certificate is evident
-Determine whether the opener's client credential is exportable software state or device-bound. Do not commit private key material.
+Use the historical MyQ firmware only as a structural reference; never transplant its device key/offset assumptions into the owner's unit without exact-current-image evidence.
 
-### If TLS can legitimately be terminated
-Only then recover application semantics (MQTT or otherwise), build the minimum telemetry-only emulator, then test one explicit command.
+## 8. One bounded local-control experiment only after semantics are known
 
-A self-signed certificate failure alone is **not** proof of pinning; ordinary CA validation produces the same result.
+Implementation preference:
 
-## 7. Broadlink integration target
+1. reuse an internal command bus into the G0401's existing paired RF subsystem;
+2. invoke a discovered local/test firmware primitive that calls the normal RF routine;
+3. only then consider implementing a new legitimate paired RF remote for the exact ceiling-opener protocol.
 
-Any successful true-local implementation must expose:
+Before any action:
+
+- current state known;
+- path physically clear;
+- explicit open/close semantics understood, not blind toggle;
+- one command only;
+- no retry after an ambiguous result;
+- final state independently verified.
+
+Any successful local implementation must expose the stable Broadlink contract:
 
 ```text
 GET  /garage/status
@@ -188,29 +172,41 @@ POST /garage/open
 POST /garage/close
 ```
 
-Broadlink configuration:
+## 9. Cloud emulator is now opportunistic
+
+Issue #6 is not the primary attack while the device's PSK remains unknown. Return to it only if exact firmware/NVM work gives us the current PSK/identity or another legitimate way to reproduce the TLS session. Then decrypt/classify the application protocol and confirm or reject MQTT.
+
+Do not spend a hardware session re-proving TCP/8883 or attempting certificate tricks already ruled out by the PSK handshake.
+
+## 10. Keep moving when one track is blocked
+
+- no SDR -> board/UART/SWD;
+- no debugger -> RF/log-UART/OTA;
+- SWD locked -> OTA then external-flash planning;
+- external flash encrypted -> internal-bus/RF still valuable;
+- no internal bus -> classify exact RF and examine legitimate new-remote pairing;
+- exact firmware reveals PSK -> resume #6;
+- a step becomes destructive -> stop that step and continue a reversible track.
+
+## Handoff requirement
+
+Use the detailed template in #7. At minimum report:
 
 ```text
-MYQ_LOCAL_URL=http://<local-service>
-MYQ_LOCAL_API_KEY=<private key>
+WORKING BASELINE: PASS/FAIL
+CEILING OPENER: <sanitized model + Learn color>
+RF SENSOR: R0/R1/R2
+RF OPENER: T0/T1/T2/T3
+BOARD: log UART / comm UART / SWD mapped yes/no
+INTERNAL BUS: B0/B1/B2/B3/B4
+SWD/FIRMWARE: D0/D1/D2/D3
+EXACT FW 1.10 IMAGE: yes/no
+LOCAL STATUS: yes/no
+LOCAL COMMAND: yes/no
+PSK/8883: blocked/actionable
+COMMITS: <list or none>
+NEXT HIGHEST-VALUE TEST: <one sentence>
+BLOCKERS/TOOLS NEEDED: <short list>
 ```
 
-Broadlink already prefers this over the Superbox bridge.
-
-## What counts as useful progress
-
-Do not stop just because local command control is not achieved in one session. These are distinct milestones:
-
-- opener positively identified;
-- setup portal captured;
-- local endpoint found;
-- normal-LAN local status found;
-- broker hostname found;
-- TCP 8883 confirmed;
-- MQTT confirmed;
-- DNS redirect followed;
-- TLS model classified;
-- telemetry semantics recovered;
-- one local command works.
-
-Post sanitized evidence to #1, #3, #5, or #6 as appropriate and keep raw captures local/ignored.
+Update #7 whenever a meaningful level changes so another agent can resume without repeating the experiment.

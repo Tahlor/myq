@@ -30,6 +30,14 @@ def _dump(value: Any) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
 
 
+def _require_action_confirmation(action: str, confirmation: str | None) -> None:
+    if confirmation != action:
+        raise HTTPException(
+            status_code=428,
+            detail=f"Set X-MyQ-Confirm: {action} to authorize this command",
+        )
+
+
 def select_door(
     doors: list[dict[str, Any]],
     *,
@@ -113,6 +121,14 @@ def create_app(api_key: str) -> FastAPI:
     def status() -> dict[str, Any]:
         return {"backend": "direct-cloud", "doors": translate(client.door_status)}
 
+    @app.get("/accounts/{account_id}/status", dependencies=[protected])
+    def account_status(account_id: str) -> dict[str, Any]:
+        return {
+            "backend": "direct-cloud",
+            "account_id": account_id,
+            "doors": translate(lambda: client.door_status(account_id)),
+        }
+
     @app.get("/garage/status", dependencies=[protected])
     def garage_status() -> dict[str, Any]:
         door = configured_door()
@@ -127,35 +143,38 @@ def create_app(api_key: str) -> FastAPI:
     def garage_action(action: str) -> dict[str, Any]:
         door = configured_door()
         state = str(door.get("door_state") or "").strip().lower()
-        if state == action:
-            return {
-                "ok": True,
-                "changed": False,
-                "action": action,
-                "state": state,
-                "backend": "direct-cloud",
-            }
-        if door.get("online") is False:
-            raise HTTPException(status_code=503, detail="Configured garage door is offline")
+        desired = "open" if action == "open" else "closed"
+        if state not in {"open", "closed"}:
+            raise HTTPException(
+                status_code=503,
+                detail="Configured garage door state is not stable",
+            )
+        if door.get("online") is not True:
+            raise HTTPException(
+                status_code=503,
+                detail="Configured garage door is not confirmed online",
+            )
         account_id = str(door.get("account_id") or "")
         opener_id = str(door.get("door_opener_id") or "")
         if not account_id or not opener_id:
             raise HTTPException(status_code=503, detail="Garage door identifiers are unavailable")
-        translate(lambda: client.door_action(account_id, opener_id, action))
-        return {
-            "ok": True,
-            "changed": True,
-            "action": action,
-            "previous_state": state or None,
-            "backend": "direct-cloud",
-        }
+        result = translate(
+            lambda: client.door_command(account_id, opener_id, action)
+        )
+        return {**result, "backend": "direct-cloud", "desired_state": desired}
 
     @app.post("/garage/open", dependencies=[protected])
-    def open_garage() -> dict[str, Any]:
+    def open_garage(
+        x_myq_confirm: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _require_action_confirmation("open", x_myq_confirm)
         return garage_action("open")
 
     @app.post("/garage/close", dependencies=[protected])
-    def close_garage() -> dict[str, Any]:
+    def close_garage(
+        x_myq_confirm: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _require_action_confirmation("close", x_myq_confirm)
         return garage_action("close")
 
     @app.get("/accounts", dependencies=[protected])

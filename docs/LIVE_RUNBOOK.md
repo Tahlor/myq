@@ -2,6 +2,15 @@
 
 This is the shortest hands-on sequence for the local agent. The objective is to keep a working 2026 control path while recovering an opener-local protocol.
 
+## 🚨 HARD STOP: do not return to `pymyq`
+
+`pymyq` is **COMPLETELY DEPRECATED**. We should **NEVER EVER** install it,
+debug it, revive it, or use it as a fallback. Reconsider it only if
+reproducible live evidence from **2026 or later** proves it works against the
+owner's current account and opener. Historical code, old issues, and imports
+do not qualify. Follow the official-app, true-local, or explicitly experimental
+direct-cloud paths documented below.
+
 ## 0. Working baseline first: official app bridge
 
 Follow issue #1 and `docs/APP_BRIDGE.md` until all are true:

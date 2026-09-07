@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
 import myq_bridge.cloud_cli as cloud_cli
 from myq_bridge.cloud import (

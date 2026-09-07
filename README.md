@@ -2,6 +2,16 @@
 
 Software-only integration work for Chamberlain/LiftMaster myQ devices. The goal is reliable home-automation control **without adding hardware to the garage opener**.
 
+## 🚨 HARD STOP: `pymyq` is COMPLETELY DEPRECATED
+
+This is a stop sign, not a TODO: we should **NEVER EVER** install `pymyq`,
+debug it, pin it, update it, revive it, use it as a fallback, or spend time
+adapting its historical endpoints. It is not a supported implementation or
+research target. Reopen that decision only if someone produces reproducible
+live evidence from **2026 or later** that it works against the owner's current
+account and opener. A successful import, old GitHub issue, or historical
+endpoint does not qualify.
+
 ## Architecture and priority
 
 We are pursuing three software layers, with production and research separated deliberately:

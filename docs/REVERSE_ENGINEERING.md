@@ -1,6 +1,6 @@
 # Track B1 — app/cloud protocol recovery
 
-## Non-negotiable implementation policy
+## 🚨 Non-negotiable implementation policy
 
 `pymyq` is **COMPLETELY DEPRECATED** for this project. This is a stop sign, not
 a TODO: we should **NEVER EVER** install it, debug it, pin it, revive it, or use

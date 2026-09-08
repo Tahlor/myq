@@ -40,6 +40,7 @@ class BridgeAccessibilityService : AccessibilityService() {
         result.put("configured_doors", doorStates.length())
         result.put("doors", doorStates)
         result.put("inferred_state_tokens", inferStateTokens(root))
+        NotificationStateStore.read(this)?.let { result.put("notification_state", it) }
         result
     }
 

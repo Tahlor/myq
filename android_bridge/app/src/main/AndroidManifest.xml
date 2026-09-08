@@ -40,6 +40,16 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".BridgeNotificationListenerService"
+            android:exported="true"
+            android:label="myQ LAN Bridge notifications"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".BridgeBootReceiver"
             android:enabled="true"

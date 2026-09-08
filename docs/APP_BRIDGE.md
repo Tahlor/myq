@@ -83,14 +83,14 @@ bridge component, preserves other enabled services, starts the visible bridge
 activity, and verifies both enabled and bound state. It does not change root,
 debug, su, or system-image security properties.
 
-## Planned notification side-channel
+## Optional notification side-channel
 
-The #9 notification-driver candidate should accept only notifications from the
-official myQ package, normalize state plus an epoch timestamp, and keep bodies
-out of logs and responses. It must be advisory, stale-aware, and never used as
-sole command authorization. Until that listener and its read-only tests exist,
-accessibility/UIAutomator remains authoritative; enabling notification access
-is a future user-visible step, not an unattended action.
+The native bridge now includes a package-filtered notification listener. It
+stores only normalized state plus an epoch timestamp and never stores or
+returns notification bodies. It is advisory, stale-aware, and never used as
+sole command authorization; accessibility/UIAutomator remains authoritative.
+Notification access has not been enabled or runtime-validated in this
+unattended run and requires a future user-visible settings step.
 
 ## Recovery/watchdog
 

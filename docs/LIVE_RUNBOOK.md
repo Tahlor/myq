@@ -73,9 +73,10 @@ shown a focus-loss ANR, so the dashboard path remains the foreground baseline.
 2. **UIAutomator fallback:** retain `src/myq_bridge/` for hierarchy dumps,
    selector calibration, and a second driver when the native service is not
    enough. It must remain foreground-only and fail closed on unknown state.
-3. **Notification side-channel:** capture notification text/timestamps as an
-   advisory state signal. It cannot authorize an action and must be compared
-   with a fresh app read.
+3. **Notification side-channel:** the native bridge has a package-filtered
+   listener that stores normalized state/timestamps only. It is advisory,
+   stale-aware, cannot authorize an action, and must be compared with a fresh
+   app read. Notification access remains a future user-visible validation step.
 4. **Screenshot/vision driver:** add a read-only screenshot/vision observer
    for layouts that expose state visually but not reliably in the accessibility
    tree. Keep raw screenshots ignored and require independent state confirmation

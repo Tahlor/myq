@@ -35,7 +35,12 @@ We are pursuing three software layers, with production and research separated de
 
    The repository contains clean-room direct-cloud tooling because it is useful for protocol comparison and controlled experiments, but **Broadlink does not use it by default**. Community direct-cloud integrations have repeatedly broken as Chamberlain changes/blocks unofficial access. It must not be promoted to production unless independently proven durable, not merely shown to work once.
 
-See **`docs/LIVE_RUNBOOK.md`** for the concrete hands-on sequence. Current execution tickets are #1 (Superbox), #3 (LAN/8883), #5 (pairing/setup service), and #6 (cloud emulation). Issue #2 is explicitly experimental.
+See **`docs/LIVE_RUNBOOK.md`** for the concrete hands-on sequence. The current
+cross-track execution index is issue #4, with #7/#8 covering the prioritized
+G0401 hardware, internal-bus, firmware, and RF work. Issues #1 (Superbox), #3
+(LAN/8883), and #5 (pairing/setup service) remain supporting evidence tracks;
+#6 (cloud emulation) is blocked/opportunistic while the device PSK is unknown,
+and #2 is explicitly experimental.
 
 ## Official-app / Superbox bridge
 
@@ -168,4 +173,6 @@ A garage door is a physical access-control device. The project:
 - never retries through another backend after an ambiguous mutating request;
 - keeps credentials, rotating OAuth tokens, APKs, screenshots/UI dumps, pcaps and raw captures out of Git.
 
-See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`, `docs/LIVE_RUNBOOK.md`, and issues #1/#3/#5/#6 for live evidence gates.
+See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`,
+`docs/G0401_HARDWARE_PROGRESS.md`, `docs/LIVE_RUNBOOK.md`, and issues
+#1/#3/#4/#5/#6/#7/#8 for live evidence gates.

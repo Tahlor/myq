@@ -121,6 +121,13 @@ replace the official-app baseline with an unofficial client.
   owner-authorized local images. Never transplant historical keys/layouts into
   the current device.
 
+For offline triage of APK/resources/firmware artifacts, use the secret-safe
+catalog; it emits hashes and signal counts, never matching payloads:
+
+```powershell
+python tools/ota_surface_catalog.py captures/firmware --out captures/ota/catalog.json
+```
+
 ### 6. Bounded current-2026 cloud and partner fallback
 
 The clean-room `myq-cloud` client may be used for read-only MFA/refresh/session

@@ -55,6 +55,15 @@ Offline, secret-safe triage of related firmware/SPI dumps. It locates the
 historical myq_aes record, reproduces the observed TEA unwrap in memory, and
 prints metadata/hashes only. It does not derive or print a current-device key.
 
+## ota_surface_catalog.py
+
+Offline catalog for APK/resources/firmware artifacts. It reports only hashes,
+sizes, signal category names, and match counts for OTA/update, Realtek/AmebaD
+`RTL8720CS`/`6220N-IS`, and PSK-provisioning lineage clues. It never emits
+matching strings or secret bytes:
+
+    python tools/ota_surface_catalog.py captures/firmware --out captures/ota/catalog.json
+
 ## historical_mcu_protocol.py
 
 Offline parser/tests for labeled public historical MCU frames. Its CRC,

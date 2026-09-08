@@ -1,178 +1,107 @@
-# myQ software bridge
+# myQ software-only bridge
 
-Software-only integration work for Chamberlain/LiftMaster myQ devices. The goal is reliable home-automation control **without adding hardware to the garage opener**.
+This repository builds a reliable software-only integration for the owner's
+existing Chamberlain/LiftMaster myQ system. The current goal excludes ratgdo,
+relays, ESP32s, wiring changes, replacement logic boards, and other
+garage-side hardware.
 
-## 🚨 HARD STOP: `pymyq` is COMPLETELY DEPRECATED
+## Authority
 
-This is a stop sign, not a TODO: we should **NEVER EVER** install `pymyq`,
-debug it, pin it, update it, revive it, use it as a fallback, or spend time
-adapting its historical endpoints. It is not a supported implementation or
-research target. Reopen that decision only if someone produces reproducible
-live evidence from **2026 or later** that it works against the owner's current
-account and opener. A successful import, old GitHub issue, or historical
-endpoint does not qualify.
+- **Issue #9 is the only active implementation/research worklist.** Its job is
+  to exhaust credible software-only routes and record evidence.
+- **Issue #4 is the only handoff/index.** It points to the current state and
+  the next #9 item; it is not a competing queue.
+- Issues **#1-3 and #5-8 are closed archive/superseded records**. Do not use
+  them as execution instructions.
+- Hardware is deferred. It becomes eligible only when #9 explicitly records
+  both `SOFTWARE_EXHAUSTED=yes` and `HARDWARE_NOW_JUSTIFIED=yes`.
 
-The full operational rule is in
-[`docs/PYMYQ_DEPRECATION.md`](docs/PYMYQ_DEPRECATION.md). Read it before
-opening or accepting any garage-related task.
+The production baseline is the official myQ Android app on the rooted
+SuperBOX S7MAX, reached through the package-scoped `android_bridge/` service:
 
-## Architecture and priority
+```text
+home automation -> Superbox bridge -> official myQ Android app -> Chamberlain -> G0401
+```
 
-We are pursuing three software layers, with production and research separated deliberately:
+Direct cloud is experimental/current-2026 fallback-oracle tooling only. A
+successful one-off read or command does not promote it to production. `pymyq`
+is permanently deprecated; see [docs/PYMYQ_DEPRECATION.md](docs/PYMYQ_DEPRECATION.md).
 
-1. **Official-app bridge — production baseline**
-   `Home automation -> Superbox:8765 -> official myQ Android app -> myQ cloud -> opener`
+## #9 software-exhaustion order
 
-   This is the practical path demonstrated working in 2026 and is the first thing the local agent should make reliable for Broadlink.
+Before hardware, #9 must evaluate and record an outcome for every credible
+software route:
 
-2. **True local / opener-side control — preferred end state**
-   `Home automation -> opener on LAN`
+1. Audit the exact official APK/runtime for UI-free internal command dispatch:
+   exported activities, deep links, shortcuts/widgets, intent paths, and
+   action-call sites. Read-only static evidence comes first; do not invoke an
+   unknown component against the real opener.
+2. Keep the official-app bridge usable: Accessibility plus a guarded Single
+   Tap path, the Python/UIAutomator fallback, the notification state
+   side-channel, and a screenshot/vision third driver.
+3. Test backup/clone of an authenticated Android environment without putting
+   credentials, tokens, APKs, screenshots, or UI dumps in Git. ReDroid is a
+   spare-host option only if the Superbox path is blocked.
+4. Use alternate current myQ Community/Craftsman clients as code oracles only;
+   do not add an unlicensed or deprecated runtime dependency.
+5. Exhaust evidence-driven normal-LAN HTTP reads, then passive OTA/current
+   firmware discovery. Do not enter setup mode, reset, re-pair, or force an
+   update in an unattended run.
+6. Fingerprint the Realtek/AmebaD RTL8720CS lineage and PSK-provisioning
+   lineage, and run the offline historical MCU parser against sanitized
+   evidence only.
+7. Bound current-2026 MFA/refresh direct-cloud experiments, then check
+   Ezlo SoftHub/Tricon and IFTTT/partner surfaces as compatibility oracles.
 
-   First inspect the opener's own supported pairing/provisioning service (`myQ-*`, `setup.myqdevice.com`) and test exact discovered endpoints on its normal LAN IP. If there is no reusable local API, capture the opener's outbound DNS/TLS/TCP 8883 traffic and determine whether a local Chamberlain-service emulator can replace the cloud.
+The exact order and evidence template are in
+[docs/LIVE_RUNBOOK.md](docs/LIVE_RUNBOOK.md). Completion and the hardware gate
+are in [docs/COMPLETION_CRITERIA.md](docs/COMPLETION_CRITERIA.md).
 
-3. **Direct MyQ cloud REST client — experimental evidence only**
-   `Home automation -> unofficial MyQ cloud API -> opener`
+## Current evidence that must not be lost
 
-   The repository contains clean-room direct-cloud tooling because it is useful for protocol comparison and controlled experiments, but **Broadlink does not use it by default**. Community direct-cloud integrations have repeatedly broken as Chamberlain changes/blocks unofficial access. It must not be promoted to production unless independently proven durable, not merely shown to work once.
+The current target is `MYQ-G0401`, firmware `1.10`. Read-only evidence shows
+normal-LAN TCP/80 setup/metadata behavior and no proven local garage-action
+endpoint. The device has an outbound TCP/8883 session. Its observed TLS 1.2
+handshake uses `TLS_PSK_WITH_AES_128_CBC_SHA` with no SNI or ALPN. The port does
+not prove MQTT; a fake certificate, DNS-only redirect, or generic MQTT broker
+is insufficient without the per-device PSK and encrypted application
+protocol.
 
-See **`docs/LIVE_RUNBOOK.md`** for the concrete hands-on sequence. The current
-cross-track execution index is issue #4, with #7/#8 covering the prioritized
-G0401 hardware, internal-bus, firmware, and RF work. Issues #1 (Superbox), #3
-(LAN/8883), and #5 (pairing/setup service) remain supporting evidence tracks;
-#6 (cloud emulation) is blocked/opportunistic while the device PSK is unknown,
-and #2 is explicitly experimental.
+The current app's `CHUB` BLE surface is commissioning/metadata oriented; no
+proven operation command exists there. Historical `myq_aes`/NVM evidence and
+the historical MCU parser are useful structural leads, not current-device
+credentials. Preserve the working official-app path and the guarded direct-
+cloud one-off as experimental evidence.
 
-## Official-app / Superbox bridge
+## Official-app bridge quick start
 
-The existing **SuperBOX S7MAX** is our Android host:
-
-- Android 12 / API 31
-- 32-bit ARM (`armeabi-v7a`)
-- root available
-- persistent ADB reachable on the home LAN
-- logcat, app sideloading, and Frida-server deployment already established
-
-`android_bridge/` is an on-device companion accessibility service and authenticated HTTP server. GitHub CI builds it as artifact **`myq-superbox-bridge-debug`**.
-
-First live run:
+The SuperBOX is Android 12/API 31, 32-bit ARM (`armeabi-v7a`), rooted, and
+reachable through network ADB. Install and authenticate the exact official APK
+interactively, then build the companion:
 
 ```powershell
 $serial = .\scripts\connect_superbox.ps1
-
-# Install a locally obtained official myQ APK/split set; authenticate interactively.
 .\scripts\install_myq_superbox.ps1 -PackagePath C:\path\to\myq -AdbSerial $serial
-
-# Build/install our companion and get its local API key.
 $key = .\scripts\build_install_android_bridge.ps1 -AdbSerial $serial | Select-Object -Last 1
 $headers = @{ 'X-API-Key' = $key }
-
-# Inspect current myQ UI nodes and calibrate state/action selectors.
-Invoke-RestMethod http://<superbox-ip>:8765/debug/nodes -Headers $headers
-.\scripts\push_bridge_config.ps1 -AdbSerial $serial -ConfigPath config\doors.json
-
-# Read state before any physical command.
 Invoke-RestMethod http://<superbox-ip>:8765/status -Headers $headers
 ```
 
-For a native command, add an action-matching `X-MyQ-Confirm` header (`open`, `close`, or `toggle`) to `$headers` and use an explicit endpoint. The native service is scoped only to `com.chamberlain.android.liftmaster.myq`. It never launches myQ from the LAN server: the user-facing activity brings the app's dashboard activity to the foreground before UI reads or commands. The Python/UIAutomator implementation under `src/myq_bridge/` is retained as a diagnostic fallback.
+Bring the official dashboard to the foreground before protected reads. Copy
+`config/doors.example.json` to ignored `config/doors.json` and calibrate only
+read-only state selectors first. Every explicit action requires matching
+confirmation, a stable observed pre-state, one request at most, and a fresh
+verified post-state. The notification side-channel is advisory and never
+authorizes a command by itself.
 
-## Direct pairing / provisioning research
+## Experimental tools and hygiene
 
-Supported MyQ setup behavior gives us a direct-device foothold: compatible openers expose a temporary `myQ-*` Wi-Fi network and a setup web service reached through `setup.myqdevice.com`.
+`src/myq_bridge/` is the UIAutomator diagnostic/second driver. `tools/`
+contains read-only LAN/TLS observation helpers and offline historical parsers.
+`myq-cloud` is deliberately bounded experimental oracle tooling and requires
+`MYQ_ENABLE_EXPERIMENTAL_CLOUD=1`; no checked-in service deploys it.
 
-The repository now includes a GET-only capture tool:
-
-```bash
-python tools/setup_portal_capture.py http://setup.myqdevice.com/
-```
-
-or, when addressing the setup gateway directly:
-
-```bash
-python tools/setup_portal_capture.py http://<SETUP-GATEWAY-IP>/ --host-header setup.myqdevice.com
-```
-
-It saves the shipped HTML/JS/CSS under ignored `captures/` and extracts candidate local API strings without submitting Wi-Fi credentials. Issue #5 defines the experiment and the normal-LAN follow-up.
-
-## Opener-side cloud emulation research
-
-Current Chamberlain support says MyQ devices require **TCP 8883** to communicate with MyQ servers. Because 8883 is conventionally MQTT-over-TLS, MQTT is a strong hypothesis, but the port number alone is not proof.
-
-Once the opener is positively identified and its real Chamberlain hostname is observed from DNS/TLS captures, the first redirection test is deliberately passive:
-
-```bash
-sudo python tools/tls_clienthello_listener.py --bind 0.0.0.0 --port 8883
-```
-
-Temporarily redirect only the discovered opener hostname to that host. The listener records the opener's initial TLS ClientHello metadata (SNI, ALPN, cipher/extension counts) and sends no application command. A connection establishes emulator milestone E0: the opener follows our redirect. Issue #6 contains the TLS/protocol/emulator decision tree.
-
-The current MYQ-G0401 goes further than E0: its live TLS 1.2 handshake offers
-only `TLS_PSK_WITH_AES_128_CBC_SHA` (`0x008c`) plus the renegotiation signaling
-value, with no SNI or ALPN. `tools/tls_transparent_probe.py` can relay only the
-handshake to a known upstream and blocks application-data records. This proves
-that a local replacement needs the device's PSK and encrypted application
-protocol; a fake certificate or generic MQTT listener is not enough.
-
-## Installed-APK static analysis
-
-Pull and decompile the **exact installed official app** before guessing about pairing or broker behavior:
-
-```powershell
-$dir = .\scripts\pull_myq_apks.ps1
-.\scripts\decompile_myq.ps1 -ApkDirectory $dir
-```
-
-Then:
-
-```bash
-python tools/summarize_jadx.py <jadx-output>
-```
-
-The summary prioritizes:
-
-- setup/provisioning hostnames and code;
-- local API paths/listeners;
-- MQTT/8883/broker clues;
-- TLS pinning, trust-manager and client-certificate clues;
-- Wi-Fi/BLE commissioning code.
-
-## Other protocol-recovery tooling
-
-```powershell
-# Capture app metadata without committing account credentials/tokens.
-.\scripts\capture_myq_logcat.ps1 -Seconds 60
-.\scripts\trace_myq_network.ps1 -InstallFridaServer
-
-# Find the opener, including ARP-visible devices that ignore ICMP.
-python tools\lan_probe.py --subnet <home-subnet>
-
-# Read router conntrack metadata without changing network state.
-.\scripts\capture_router_conntrack.ps1 -CandidateIp <candidate-ip>
-
-# Summarize DNS/TLS/endpoints from a router/AP/switch capture.
-python tools\pcap_summary.py capture.pcap --opener-ip <opener-ip>
-```
-
-## Experimental direct-cloud tooling
-
-A recent 2026 implementation exposed useful current v6 protocol facts, which this repository clean-room implemented for interoperability research. That tooling is useful as an **oracle** in experiments—for example, correlating a known server-side close command with opener-side TCP 8883 traffic—but it is not the production plan.
-
-Broadlink includes the direct-cloud backend only when `MYQ_ENABLE_EXPERIMENTAL_CLOUD=1` is explicitly set. Do not enable it for normal garage automation.
-
-## Safety / secrets
-
-A garage door is a physical access-control device. The project:
-
-- requires an API key on local control/state APIs;
-- requires action-specific confirmation on every mutating CLI/REST boundary;
-- performs no geolocation-triggered opening by default;
-- serializes UI commands;
-- requires myQ to already be in the foreground before UI reads or commands;
-- no-ops when an explicit requested state is already observed;
-- refuses a UI toggle when current state is unknown;
-- never retries through another backend after an ambiguous mutating request;
-- keeps credentials, rotating OAuth tokens, APKs, screenshots/UI dumps, pcaps and raw captures out of Git.
-
-See `docs/APP_BRIDGE.md`, `docs/REVERSE_ENGINEERING.md`, `docs/LAN_RECON.md`,
-`docs/G0401_HARDWARE_PROGRESS.md`, `docs/LIVE_RUNBOOK.md`, and issues
-#1/#3/#4/#5/#6/#7/#8 for live evidence gates.
+Keep credentials, OAuth/session tokens, APKs, firmware/NVM, pcaps, screenshots,
+UI dumps, and live identifiers in ignored local paths. Never use a command,
+toggle, reset, re-pair, RF replay, setup transition, or hardware probe as a
+connectivity test.

@@ -1,81 +1,59 @@
-# MyQ reverse-engineering tools
+# MyQ software-first research tools
 
-These tools support opener-local interoperability work. Raw captures belong under ignored `captures/` and must not be committed.
+Raw captures belong under ignored captures/ and must not be committed. These
+tools are observation/parsing aids; none is a production cloud or garage
+command implementation.
 
-## `lan_probe.py`
-Find likely Chamberlain/LiftMaster devices on the home LAN, including ARP-visible hosts that ignore ping.
+The next #9 implementation items are a secret-safe APK surface inventory and
+a HEAD/GET-only G0401 route archaeologist. They are intentionally not listed as
+available commands until their read-only behavior and tests are committed.
 
-```bash
-python tools/lan_probe.py --subnet 192.168.187.0/24
-```
+## lan_probe.py
 
-## `setup_portal_capture.py`
-GET-only capture of the opener's supported setup portal and same-origin JS/CSS assets. Extracts candidate local API paths from the shipped code.
+Find likely Chamberlain/LiftMaster devices on the home LAN, retaining
+ARP-visible hosts that ignore ping.
 
-```bash
-python tools/setup_portal_capture.py http://setup.myqdevice.com/
-```
+    python tools/lan_probe.py --subnet 192.168.187.0/24
 
-Or by setup-gateway IP:
+## setup_portal_capture.py
 
-```bash
-python tools/setup_portal_capture.py http://<SETUP-GATEWAY-IP>/ --host-header setup.myqdevice.com
-```
+GET-only capture of the supported setup portal and same-origin JS/CSS assets.
+It does not submit Wi-Fi credentials.
 
-The tool does not submit forms or Wi-Fi credentials.
+    python tools/setup_portal_capture.py http://setup.myqdevice.com/
 
-## `pcap_summary.py`
-Summarize opener DNS/TLS/remote endpoints from a router/AP/switch capture.
+## pcap_summary.py
 
-```bash
-python tools/pcap_summary.py captures/opener.pcap --opener-ip <OPENER-IP>
-```
+Summarize DNS, TLS-SNI, and endpoint metadata from an existing router/AP/switch
+capture. Encrypted application payloads are not decoded.
 
-## `tls_clienthello_listener.py`
-Passive listener for the first cloud-emulation experiment. After discovering the opener's real Chamberlain hostname, temporarily redirect only that hostname to the listener host and see whether the opener follows DNS.
+    python tools/pcap_summary.py captures/opener.pcap --opener-ip <opener-ip>
 
-```bash
-sudo python tools/tls_clienthello_listener.py --bind 0.0.0.0 --port 8883
-```
+## tls observation tools
 
-It records only initial TLS metadata such as SNI/ALPN/cipher counts and does not complete TLS or send an application command.
+tls_clienthello_listener.py passively records initial ClientHello metadata.
+tls_transparent_probe.py relays only handshake records to a known upstream and
+blocks application-data records. The current G0401 uses a PSK handshake, so
+these tools do not create a usable local broker.
 
-## `tls_transparent_probe.py`
-Handshake-only relay for a controlled, already-authorized redirect when the
-opener's upstream endpoint is known. It forwards TLS handshake records to the
-real upstream, logs record/cipher metadata, and blocks application-data records
-in both directions. It does not terminate TLS or inject a command:
+## myq_firmware_psm.py
 
-```bash
-python tools/tls_transparent_probe.py --bind 0.0.0.0 --port 8883 \
-  --upstream-host connect.myqdevice.com --upstream-port 8883 --once
-```
+Offline, secret-safe triage of related firmware/SPI dumps. It locates the
+historical myq_aes record, reproduces the observed TEA unwrap in memory, and
+prints metadata/hashes only. It does not derive or print a current-device key.
 
-Use only with a temporary router rule scoped to the confirmed opener and remove
-that rule immediately after the observation. The current MYQ-G0401 evidence
-shows a PSK-based TLS handshake, so this tool is an observation aid rather than
-a local broker implementation.
+## historical_mcu_protocol.py
 
-## `myq_firmware_psm.py`
-Offline, secret-safe triage for a firmware/SPI-flash dump. It locates the
-related firmware's `myq_aes` PSM record, reproduces the observed 32-round
-four-word TEA unwrap, and prints metadata plus hashes only—never the key bytes:
+Offline parser/tests for labeled public historical MCU frames. Its CRC,
+state, and action meanings are hypotheses for comparison and do not prove
+current G0401 compatibility.
 
-```bash
-python tools/myq_firmware_psm.py captures/firmware.bin
-```
+## summarize_jadx.py
 
-Keep the raw dump under ignored `captures/`. The unwrap constant is from the
-related historical image, so re-validate the model/version and code literal
-before treating an output as evidence about another device.
+Static triage of the exact installed official APK for cloud hosts, local
+setup/provisioning, transport, TLS, Wi-Fi, and BLE clues. Decompile output
+stays ignored.
 
-## `summarize_jadx.py`
-Static triage of the exact installed official MyQ APK after JADX decompilation. Prioritizes opener-local provisioning, network, MQTT/cloud, TLS/pinning, Wi-Fi and BLE clues.
-
-```bash
-python tools/summarize_jadx.py <jadx-output>
-```
-
-Read `myq-static-summary.json`; it remains local with the decompile output.
-
-See `docs/LIVE_RUNBOOK.md` for the complete hands-on sequence.
+See docs/LIVE_RUNBOOK.md for the current issue #9 execution order. Direct
+cloud remains experimental/current-2026 evidence only, and pymyq is permanently
+deprecated.

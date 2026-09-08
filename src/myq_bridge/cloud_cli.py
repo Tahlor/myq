@@ -17,11 +17,23 @@ from .cloud import (
 )
 
 
+EXPERIMENTAL_CLOUD_FLAG = "MYQ_ENABLE_EXPERIMENTAL_CLOUD"
+
+
+def _require_experimental_cloud() -> None:
+    if os.environ.get(EXPERIMENTAL_CLOUD_FLAG) != "1":
+        raise RuntimeError(
+            "myq-cloud is experimental/current-2026 oracle tooling; set "
+            f"{EXPERIMENTAL_CLOUD_FLAG}=1 for an intentional run"
+        )
+
+
 def _store() -> SessionStore:
     return SessionStore(os.environ.get("MYQ_CLOUD_SESSION", "config/cloud_session.json"))
 
 
 def _client() -> MyQCloudClient:
+    _require_experimental_cloud()
     store = _store()
     return MyQCloudClient(load_cloud_session(store), on_session_updated=store.save)
 
@@ -270,6 +282,11 @@ def main() -> None:
     serve.add_argument("--port", type=int, default=int(os.environ.get("MYQ_PORT", "8766")))
 
     args = parser.parse_args()
+
+    try:
+        _require_experimental_cloud()
+    except RuntimeError as exc:
+        parser.error(str(exc))
 
     if args.command == "serve":
         api_key = os.environ.get("MYQ_API_KEY", "")

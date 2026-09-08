@@ -1,12 +1,21 @@
-# MYQ-G0401 hardware / firmware attack plan
+> 🚫 **DO NOT EXECUTE UNTIL #9 GATE.** This is a deferred hardware archive,
+> not an active queue. Execute no physical step here until issue #9 explicitly
+> records `SOFTWARE_EXHAUSTED=yes` and `HARDWARE_NOW_JUSTIFIED=yes` in
+> `docs/COMPLETION_CRITERIA.md`, with explicit approval for the next
+> least-invasive experiment.
+
+# Deferred archive — MYQ-G0401 hardware / firmware attack plan
 
 ## Objective
 
-Recover a durable **local** control + state path for the owner's Chamberlain MYQ-G0401 without depending on Chamberlain's cloud API and without adding permanent garage-opener hardware if we can avoid it.
+If the mandatory software-exhaustion gate eventually passes, this archive
+describes how to investigate a durable local control/state path for the
+owner's Chamberlain MYQ-G0401 without adding permanent garage-opener hardware.
 
 The cloud TLS-PSK path is now understood well enough to **demote PSK extraction as the primary strategy**. The better question is: where does a decrypted cloud command cross from the network MCU into the PIC/RF side, and can we observe or invoke that boundary locally?
 
-This is an execution plan for the hands-on local agent. Do not restart from a generic MyQ audit. Work top-down and preserve evidence.
+This is dormant execution context, not the current local-agent queue. Do not
+restart from a generic audit or use it before the software gate.
 
 ## High-value research already established
 
@@ -48,7 +57,10 @@ Sources:
 - https://www.fn-link.com/6220N-IS-IoT-Module-pd44915459.html
 - https://fcc.report/FCC-ID/2AATL-6220N-IS/4519624.pdf
 
-This materially changes priority: the TLS-PSK session may terminate inside the Realtek module, with a much simpler plaintext command/status protocol crossing between the `6220N-IS` and PIC18. **Prove or reject that boundary before attacking TLS credentials.**
+The deferred hypothesis is that the TLS-PSK session may terminate inside the
+Realtek module, with a simpler plaintext command/status protocol crossing
+between the 6220N-IS and PIC18. If this archive is ever activated, prove or
+reject that boundary before attacking TLS credentials.
 
 ### PIC18 has a standard non-destructive read path
 
@@ -139,7 +151,7 @@ Pass condition: at least one plausible network-MCU↔PIC bus and one PIC↔RF bu
 
 ---
 
-# Phase H2 — highest priority: passive 6220N ↔ PIC capture
+# Phase H2 — if activated: passive 6220N ↔ PIC capture
 
 ## Why this is first
 
@@ -377,28 +389,29 @@ The project does **not** need a PSK breakthrough to succeed if N4 or R4 is reach
 
 ---
 
-# Priority matrix
+# Fallback relative-payoff matrix (only after activation)
 
-| Path | Expected payoff | Risk | Priority |
+| Path | Expected payoff | Risk | Activation order |
 | --- | --- | --- | --- |
-| Passive 6220N↔PIC bus capture | Very high | Low | **P0** |
-| Passive PIC↔Si4432 capture | Very high | Low | **P0** |
-| Board/test-pad mapping | Enables everything | Low | **P0** |
-| 24C16K backup/analysis | Medium-high | Low-medium | **P1** |
-| PIC config read / CP0 check | Very high if unprotected | Low-medium | **P1** |
-| 6220N boot UART | High | Low | **P1** |
-| GD25Q64 flash dump | Very high | Medium | **P1** |
-| OTA image recovery | High | Low | **P1** |
-| RF SDR capture | Medium | Low | **P2** |
-| TLS PSK extraction as end goal | High but uncertain | High | **P3** |
-| PIC code-protection bypass | Uncertain | Very high | **P4 / spare only** |
-| Custom firmware flashing | Potentially decisive | Very high | **P4 / after backups** |
+| Passive 6220N↔PIC bus capture | Very high | Low | 1 |
+| Passive PIC↔Si4432 capture | Very high | Low | 1 |
+| Board/test-pad mapping | Enables everything | Low | 1 |
+| 24C16K backup/analysis | Medium-high | Low-medium | 2 |
+| PIC config read / CP0 check | Very high if unprotected | Low-medium | 2 |
+| 6220N boot UART | High | Low | 2 |
+| GD25Q64 flash dump | Very high | Medium | 2 |
+| OTA image recovery | High | Low | 2 |
+| RF SDR capture | Medium | Low | 3 |
+| TLS PSK extraction as end goal | High but uncertain | High | 4 |
+| PIC code-protection bypass | Uncertain | Very high | 5 / spare only |
+| Custom firmware flashing | Potentially decisive | Very high | 5 / after backups |
 
 ---
 
-# Exact first live session
+# Deferred first physical session (only after activation)
 
-The next local-agent session should **not** touch the router or cloud TLS path first.
+The next physical session, if the gate is ever approved, should not touch the
+router or cloud TLS path first.
 
 1. Verify working state and power down hub.
 2. Open enclosure and photograph both PCB sides.

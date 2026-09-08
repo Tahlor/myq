@@ -1,187 +1,111 @@
-# Track B1 — app/cloud protocol recovery
+# Official-app and cloud protocol research
 
-## 🚨 Non-negotiable implementation policy
+This document records current software evidence for issue #9. It is not a
+production-cloud design. The official Android app/Superbox bridge is the
+production baseline; direct-cloud code is a bounded current-2026 oracle or
+fallback only.
 
-`pymyq` is **COMPLETELY DEPRECATED** for this project. This is a stop sign, not
-a TODO: we should **NEVER EVER** install it, debug it, pin it, revive it, or use
-it as a fallback. Historical `pymyq` behavior is not current evidence and must
-not drive implementation decisions. The only exception is reproducible live
-evidence dated **2026 or later** that it works against the owner's current
-account and opener. Otherwise use the clean-room client in `src/myq_bridge/`,
-the direct-cloud integration in Broadlink, or the official Android fallback.
-The complete operational rule is in
-[`PYMYQ_DEPRECATION.md`](PYMYQ_DEPRECATION.md).
+## Exact app evidence
 
-## Goal
+The installed APK is myQ 5.243.1.73243,
+package com.chamberlain.android.liftmaster.myq. Its static service definitions
+include:
 
-Use the official Android app as an oracle, then replace UI automation with our own clean client wherever the current protocol permits it.
+- authentication at partner-identity.myq-cloud.com/connect/token;
+- account APIs at accounts.myq-cloud.com;
+- device APIs at devices.myq-cloud.com;
+- GDO APIs at account-devices-gdo.myq-cloud.com;
+- explicit v6 GDO PUT operations ending in /open and /close;
+- Android client id ANDROID_CGI_MYQ, scope MyQ_Residential offline_access,
+  redirect URI com.myqops://android, and PKCE S256;
+- common Android metadata MyQApplicationId, Culture, BrandId, ApiVersion 4.1,
+  App-Version, and an Android user-agent;
+- TCP/8883 diagnostic strings and App Check/Integrity feature flags.
 
-## Strong current evidence — August 2026
+Static strings are not proof of runtime enforcement or opener protocol. Exact
+APK decompilation remains local and ignored.
 
-A new public Home Assistant integration, `vector-sec/chamberlain-myq-hacs`, was created August 10, 2026 and implements direct MyQ control with:
+The shared device service exposes a v6.0 device-list route with an envelope
+containing items. The clean-room client prefers that route for Android-shaped
+sessions and falls back to the separately observed v6.2 route only on 404/405.
+This is read-only route selection.
 
-- an initial authorized JWT/access token plus refresh token;
-- standard OAuth `grant_type=refresh_token` rotation;
-- client id `IOS_CGI_MYQ`;
-- app version `5.315.0.66076` and matching iOS-style User-Agent;
-- `partner-identity.myq-cloud.com/connect/token` for refresh;
-- v6 account APIs and v6.2 device enumeration;
-- v6 door-opener `PUT .../{open|close}` commands;
-- no Play Integrity/App Check argument on the refresh or door-command request surface shown by that implementation.
+## UI-free invocation investigation
 
-This is stronger than the old 2023 API evidence. We therefore clean-room implemented the current protocol facts in `src/myq_bridge/cloud.py` and `src/myq_bridge/cloud_cli.py`. Do not copy/vendor the external implementation; its repository currently has no license file.
+The exact installed APK and runtime package metadata still need a complete,
+read-only inventory of:
 
-The remaining B1 gate was **initial authorized-session bootstrap**. That gate is now passed: on 2026-09-06, an owner-authorized session supported a live read and one explicitly authorized, sensor-verified direct-cloud open. The direct client is a working authenticated background path, but remains experimental rather than the production default; the Superbox official-app bridge remains the production baseline and bootstrap/recovery fallback while session durability and full-reboot persistence remain operational follow-up.
+- exported activities, services, receivers, and providers;
+- deep links and intent filters;
+- app shortcuts, widgets, notification actions, and Auto/car components;
+- WorkManager/job names and action repository/ViewModel call sites.
 
-On 2026-09-04, before the authorized bootstrap, this checkout had no local session file and no token environment variables, so live refresh/account validation was intentionally blocked. No token material was requested or recorded at that checkpoint; the result is superseded by the authorized validation below.
+Use the decompiled manifest and JADX source for this inventory; the next #9
+implementation item is a secret-safe helper that reports the same metadata.
+Search for PendingIntent, ShortcutInfo, AppWidgetProvider, Intent, startService,
+sendBroadcast, and open/close action methods. A manifest entry alone is not
+evidence that invocation is safe. Do not call unknown components by trial.
 
-On 2026-09-06, the owner-authorized Android OAuth flow supplied that bootstrap pair. The extractor persisted it only to the ignored session file; `myq-cloud refresh`, account discovery, device discovery, and read-only status all succeeded. The live account returned one garage door plus its hub, with the door `closed` and `online`. At that initial validation stage, no mutating endpoint was called. A later owner-authorized direct-cloud `open` was sensor-verified. The official APK subsequently ANRed while handling the OAuth callback, and a later cold start independently reproduced a `LoginActivity` focus-loss ANR, so the direct client is currently the reliable authenticated read path while app lifecycle stability remains an open Track A issue.
+Any discovered primitive must be classified as read-only, user-visible, or
+mutating before runtime use. For a mutating primitive, retain the bridge's
+stable-state, explicit-confirmation, one-action, and fresh-post-state guards.
+Never fail over to another driver after a mutating request may have reached
+MyQ.
 
-```powershell
-Copy-Item config\cloud_session.example.json config\cloud_session.json
-# Fill this local ignored file with an authorized session; never commit it.
-myq-cloud refresh
-myq-cloud accounts
-myq-cloud devices <account-id>
+## Notification state
 
-$env:MYQ_API_KEY = '<local-secret>'
-myq-cloud serve   # default port 8766
-```
+The native bridge can optionally listen only to notifications posted by the
+official myQ package. It records normalized state and timestamp metadata, not
+notification bodies. Notification state is advisory and stale-aware; it cannot
+authorize a command and does not replace a fresh app/sensor read.
 
-The direct REST facade exposes explicit open/close operations only; it does not use a toggle. Read-only status is available globally at `GET /status` and for a single account at `GET /accounts/{account_id}/status`; a read-only action preflight is available at `GET /accounts/{account_id}/doors/{door_opener_id}/preflight/{open|close}`. Mutating calls must include an action-matching `X-MyQ-Confirm: open` or `X-MyQ-Confirm: close` header. The action endpoints first read the named door and refuse an unknown, transitional, or offline state; they send at most one action and return success only after a fresh status read verifies the requested state. Same-state requests are verified no-ops, and an unverified post-action state is reported as an error.
+## Current clean-room client
 
-The clean-room client refreshes and retries an expired session for read-only HTTP requests. It deliberately does **not** replay a mutating `open`, `close`, or lock-mode request after a `401`; the caller must re-authenticate and make a fresh, explicit request after verifying state.
+src/myq_bridge/cloud.py implements the currently observed session shape:
 
-## Current APK static cross-check — 5.243.1.73243
+- rotating OAuth access/refresh tokens are stored atomically in an ignored
+  local file;
+- read-only requests may refresh and retry once after 401;
+- mutating requests are never automatically replayed after 401;
+- account/device reads normalize garage-door state;
+- explicit open/close commands serialize, preflight stable online state, send
+  at most one PUT, and verify the desired post-state;
+- same-state actions are verified no-ops.
 
-The verified APK installed on the SuperBOX is version `5.243.1.73243`. A local decompilation of that exact APK independently confirms the current cloud route families and production hosts:
+src/myq_bridge/cloud_cli.py exposes read-only status/preflight and explicit
+action-confirmed commands for research. The CLI is blocked unless
+MYQ_ENABLE_EXPERIMENTAL_CLOUD=1 is set. No checked-in service deploys it.
 
-- authentication uses `https://partner-identity.myq-cloud.com/connect/token`;
-- account APIs use `accounts.myq-cloud.com`;
-- device APIs use `devices.myq-cloud.com`;
-- door-opener APIs use `account-devices-gdo.myq-cloud.com`;
-- the v6 Retrofit service includes read access to `.../api/{apiVersion}/accounts/{accountId}/door_openers/{serialNumber}` and explicit `PUT` routes ending in `/open` and `/close`;
-- the app's version enum includes `v6.0`, while the newer device-enumeration path used by the clean-room client remains a separate live-evidence question;
-- common request metadata includes `MyQApplicationId`, `Culture`, `BrandId`, `ApiVersion: 4.1`, `App-Version`, `Accept: application/json`, and an Android model/release user agent.
+A 2026 authorized session read the owner's door and one explicitly authorized
+open completed with sensor-verified closed-to-open state. This proves a useful
+fallback/oracle path, not a durable production architecture.
 
-The same APK's OAuth parameter enum uses client id `ANDROID_CGI_MYQ`, scope `MyQ_Residential offline_access`, redirect URI `com.myqops://android`, and PKCE `S256`; refresh-token grants are implemented alongside authorization-code grants. This is a concrete reason to keep the clean-room client's client id and app identity configurable: the existing direct-refresh evidence came from a different iOS-style client identity and is not proof that the two refresh-token contexts are interchangeable.
+## Static and dynamic workflow
 
-The device route families are split across services in the APK, which matters when comparing Android runtime traffic with the newer direct client:
+Pull/decompile only the exact installed APK:
 
-- the legacy `InterfaceC7637e` service uses `api.myqdevice.com/api/v5/Accounts/{accountId}/Devices` for gateway registration/removal and `api/v5.1/...` provider-token/name operations;
-- the shared `InterfaceC7621d` service is bound to `devices.myq-cloud.com` and exposes `GET /api/{apiVersion}/Accounts/{accountId}/Devices`, details, and transmitters, with enum values through `v6.0`;
-- the current v6 GDO service is bound to `account-devices-gdo.myq-cloud.com` and exposes the lower-case `accounts/.../door_openers/...` routes, including explicit `/open` and `/close`.
+    $dir = .\scripts\pull_myq_apks.ps1
+    .\scripts\decompile_myq.ps1 -ApkDirectory $dir
+    python tools\summarize_jadx.py <jadx-output>
+The summary/inventory may report hosts, routes, component names, and method
+locations. Never print or commit usernames, passwords, OAuth codes, verifiers,
+bearer tokens, Firebase tokens, device serials, or raw notification content.
 
-The static call graph strengthens the device-list finding: the app's `C17353i` communication method invokes the shared service with `v6.0` for list/detail/rename operations, and its `C7426d` response model is an envelope containing `href`, `count`, and `items`. This is why the Android path is selected before the separately observed v6.2 route in the clean-room client.
+For runtime observation, start the official app through the user-facing
+HomeTabsActivity path. Capture sanitized logcat/DNS metadata while refreshing
+state. Frida, if needed, should log non-secret method names and request
+metadata only. Read accounts/devices/status before considering one explicit
+action. No background service should navigate the app.
 
-The clean-room client therefore prefers the APK-shaped `devices.myq-cloud.com/api/v6.0/Accounts/{id}/Devices` read for an Android-issued session and falls back to the separately observed `api/v6.2/.../Devices` route on a 404/405. iOS-shaped sessions retain the v6.2 route as their primary path. This is read-only route selection; no command endpoint is involved.
+## Provisioning and local protocol hypotheses
 
-The APK also contains TCP-8883 diagnostic text and App Check/Integrity feature flags. Their static presence is not evidence that every current request is enforced by attestation; that distinction still requires authenticated runtime observation. Raw APK/decompiler output remains local and ignored.
+The current CHUB BLE code is commissioning/metadata oriented. It does not prove
+an operational command path. The G0401 normal-LAN service and historical
+myq_aes/NVM work are documented in LAN_RECON.md. The current PSK lineage is
+still unknown: determine from static app/firmware evidence whether it is
+factory/random, server-provisioned, or derived. Stop when evidence indicates a
+device-unique secret with no software-accessible source; do not brute-force it.
 
-The OAuth manager persists the access and refresh values in the app's encrypted `LiftmasterMyQPrefs.xml` preferences. The repository now includes `scripts/extract_myq_session.ps1`, which uses the already-authorized root path on the SuperBOX, decrypts those two values in memory using the APK's app-local storage configuration, and atomically writes only the direct-client session shape to ignored `config/cloud_session.json`. It never prints token contents. A live run before authentication correctly reports that both tokens are absent.
-
-## Other references
-
-Historical clients proved the MyQ cloud API was sufficient for account login, device enumeration, state and door commands before Chamberlain's anti-automation changes:
-
-- https://github.com/hjdhjd/myq
-- official Android package: `com.chamberlain.android.liftmaster.myq`
-- current Play listing: https://play.google.com/store/apps/details?id=com.chamberlain.android.liftmaster.myq
-
-The historical v6 client also mentions an apparent MQTT interface and Firebase notifications. Treat that only as a lead until current APK/live traffic confirms which MQTT/WebSocket surfaces are app-facing versus opener-facing.
-
-## Static workflow
-
-After installing a working MyQ build on the Superbox:
-
-```powershell
-$dir = .\scripts\pull_myq_apks.ps1
-.\scripts\decompile_myq.ps1 -ApkDirectory $dir
-```
-
-`tools/summarize_jadx.py` searches the JADX output for:
-
-- `*.myq-cloud.com` domains;
-- MQTT / `8883` / broker strings;
-- Firebase App Check;
-- Play Integrity classes;
-- OAuth/PKCE/auth strings;
-- OkHttp / Retrofit / certificate pinning;
-- WebSocket endpoints.
-
-Raw decompilation stays ignored. Commit only clean-room notes describing behavior/interfaces we need for interoperability.
-
-### Highest-value classes/strings
-
-```text
-IntegrityManager
-StandardIntegrityManager
-FirebaseAppCheck
-PlayIntegrityAppCheckProviderFactory
-CertificatePinner
-OkHttpClient
-Retrofit
-Authorization
-Bearer
-code_verifier
-code_challenge
-mqtt
-8883
-wss://
-myq-cloud.com
-```
-
-Also inspect Android resources for base URLs, remote-config keys and feature flags. Split APKs can carry resources not present in `base.apk`, so retain all pulled splits even if JADX initially opens only the base.
-
-## Dynamic workflow
-
-Prefer observation before bypassing anything.
-
-1. Start the authenticated official app through its user-facing/foreground path; do not ask a background service to navigate it.
-2. Capture `logcat` while refreshing the door dashboard.
-3. Record DNS destinations from the Android host/network.
-4. If static analysis shows ordinary OkHttp/Retrofit and traffic details are still missing, attach Frida to log **non-secret request metadata**.
-5. Keep credentials/tokens out of committed output.
-6. Compare the Android app's client id/app-version/header shape with the working August 2026 iOS identity.
-7. Reproduce read-only `accounts` and `devices` calls first.
-8. Only after state reads work reliably, reproduce an explicit open/close request.
-
-The Superbox repository already contains Frida-server installation work. Reuse it rather than creating a second incompatible deployment path.
-
-## Revised session-bootstrap hypothesis
-
-The direct refresh evidence changes the likely architecture:
-
-```text
-                    one-time / recovery bootstrap
-official MyQ app  -----------------------------> authorized session
-                                                     |
-                                                     v
-Home automation -> our local REST service -> MyQ v6 cloud -> opener
-```
-
-The leading hypotheses now are:
-
-1. **Integrity is login/bootstrap-only.** Best case: authenticate with a compatible official app, then use the rotating OAuth session indefinitely in our daemon.
-2. **Client identity matters at refresh.** Capture the actual Android client id/version metadata and make it configurable; do not assume an Android-issued refresh token is interchangeable with `IOS_CGI_MYQ`.
-3. **Old authenticated session can seed a newer client.** Test session persistence/upgrades on the Superbox after basic control is proven.
-
-## Integrity decision tree
-
-- **Login-only attestation:** direct cloud becomes primary; official app is bootstrap/recovery.
-- **Refresh-time attestation:** current August 2026 direct-refresh evidence would need reconciliation with our account/token origin; keep app bridge available.
-- **Per-command attestation:** contradicted by the current direct integration unless its account/client context differs materially; verify live before assuming.
-- **Official partner/device flow becomes available:** prefer it over brittle app emulation.
-
-## Sensitive material
-
-Never commit:
-
-- usernames/passwords;
-- OAuth codes/verifiers;
-- bearer/access/refresh tokens;
-- Firebase installation/auth tokens;
-- Play Integrity verdict tokens;
-- garage/device serials if not required for public interoperability documentation.
-
-Use ignored `config/cloud_session.json` and `captures/` for local evidence. Commit only sanitized endpoint/method/schema findings.
+Historical MyQ clients and MQTT/WebSocket strings are leads only. Confirm
+current behavior from live evidence or exact APK/firmware evidence before
+assigning protocol semantics.

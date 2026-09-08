@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tahlor-myq-bridge"
 version = "0.1.0"
-description = "Software-only myQ bridge using the official Android app or direct cloud session"
+description = "Software-only myQ bridge with the official Android app as production baseline"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",

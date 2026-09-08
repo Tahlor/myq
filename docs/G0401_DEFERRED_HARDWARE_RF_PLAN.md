@@ -1,12 +1,21 @@
-# MYQ-G0401 hardware / firmware / RF attack plan
+> 🚫 **DO NOT EXECUTE UNTIL #9 GATE.** This is a deferred hardware archive,
+> not an active queue. Execute no physical step here until issue #9 explicitly
+> records `SOFTWARE_EXHAUSTED=yes` and `HARDWARE_NOW_JUSTIFIED=yes` in
+> `docs/COMPLETION_CRITERIA.md`, with explicit approval for the next
+> least-invasive experiment.
+
+# Deferred archive — MYQ-G0401 hardware / firmware / RF plan
 
 ## Objective
 
-Recover a reliable **local** control/status path for the owner's Chamberlain MYQ-G0401 without depending on Chamberlain's unofficial cloud API and without adding replacement hardware to the garage opener.
+If the mandatory software-exhaustion gate eventually passes, this archive
+describes how to investigate a reliable local control/status path for the
+owner's Chamberlain MYQ-G0401 without adding replacement hardware.
 
 The cloud-emulator track is no longer the best first attack. Live testing proved that the G0401's outbound TCP/8883 connection negotiates TLS 1.2 with `TLS_PSK_WITH_AES_128_CBC_SHA`. A fake certificate, DNS redirect, or generic MQTT broker therefore cannot replace Chamberlain by itself. Recovering the per-device PSK may eventually be useful, but it should be treated as an opportunistic consequence of firmware/NVM acquisition rather than the project’s primary bet.
 
-The preferred route is now to work **downward toward the physical RF boundary**:
+If activated, the fallback route works downward toward the physical RF
+boundary:
 
 ```text
 Broadlink / local API
@@ -438,15 +447,18 @@ This route may ultimately require an external radio to become a permanent implem
 
 ---
 
-# Phase 10 — PSK/cloud emulation becomes opportunistic
+# Phase 10 — PSK/cloud emulation remains blocked
 
-Return to issue #6 only if exact current firmware/NVM work cheaply yields:
+The direct-device emulator question remains blocked. It can be reconsidered
+only if exact current firmware/NVM work cheaply yields:
 
 - the per-device TLS PSK or its recoverable wrapped representation;
 - the PSK identity;
 - enough application-protocol detail to classify/decrypt the 8883 session.
 
-At that point the previous transparent-relay capture becomes valuable again and MQTT can be confirmed/rejected from decrypted application data.
+At that point the previous transparent-relay capture becomes valuable again and MQTT can be confirmed/rejected from decrypted application data. Until
+then this is a bounded #9 software research lane, not an execution priority
+in this archive.
 
 Do **not**:
 
@@ -457,9 +469,10 @@ Do **not**:
 
 ---
 
-# Recommended live-session order
+# Dormant fallback sequence (only after activation)
 
-A hands-on agent should normally execute this order, continuing to the next item when blocked rather than stopping for a fresh audit:
+This list is not an instruction for the current agent. If the explicit
+software-exhaustion gate is approved later, a hands-on agent can use this order:
 
 1. identify the ceiling-opener model/Learn-button color and record baseline;
 2. inspect public FCC/module pinout and photograph the owner's G0401 board;
@@ -479,7 +492,8 @@ This order deliberately front-loads tests that are cheap, reversible and likely 
 
 # What the local agent should have ready
 
-Use what is already available before buying anything. Useful equipment, in descending priority:
+If this archive is activated, use what is already available before buying
+anything. Equipment is listed from least to most invasive:
 
 - phone/camera with macro capability;
 - DMM with continuity mode;

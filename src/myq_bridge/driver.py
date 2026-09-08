@@ -44,12 +44,30 @@ class MyQDriver:
     def launch(self) -> None:
         d = self.connect()
         current = self._current_app(d)
-        if current.get("package") == self.settings.package_name:
+        if (
+            current.get("package") == self.settings.package_name
+            and self._activity_matches(
+                current.get("activity", ""),
+                self.settings.dashboard_activity,
+            )
+        ):
             return
         raise RuntimeError(
             "official myQ must already be in the foreground; use the user-facing "
             f"{self.settings.dashboard_activity} action before reading or commanding"
         )
+
+    @staticmethod
+    def _activity_matches(current: str, expected: str) -> bool:
+        """Accept Android's short or fully-qualified spelling of one activity."""
+
+        current = current.strip()
+        expected = expected.strip()
+        if not current or not expected:
+            return False
+        if current == expected or current.lstrip(".") == expected.lstrip("."):
+            return True
+        return current.rsplit(".", 1)[-1] == expected.rsplit(".", 1)[-1]
 
     @staticmethod
     def _current_app(device: Any) -> dict[str, str]:

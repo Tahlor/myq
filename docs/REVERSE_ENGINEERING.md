@@ -30,6 +30,17 @@ containing items. The clean-room client prefers that route for Android-shaped
 sessions and falls back to the separately observed v6.2 route only on 404/405.
 This is read-only route selection.
 
+## 2026-09-08 static notification result
+
+The ignored local smali extraction of the installed APK was checked without
+invoking any component. MyQMessagingService builds a notification
+`PendingIntent` and a notification action targeting
+`SnoozeBroadcastReceiver`; the reviewed action string is `snooze`, not a garage
+open/close operation. This is a notification/UI clue, not a safe internal
+command surface. The native bridge therefore consumes only normalized
+notification state and does not attempt to fire the official app's
+`PendingIntent`.
+
 ## UI-free invocation investigation
 
 The exact installed APK and runtime package metadata still need a complete,

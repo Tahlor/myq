@@ -9,6 +9,7 @@ from tools.android_surface_inventory import (
     inventory_source_signals,
 )
 from tools.g0401_http_archaeology import (
+    classify_route,
     extract_candidate_paths,
     extract_same_origin_assets,
     run_archaeology,
@@ -132,3 +133,29 @@ def test_g0401_path_extractors_strip_query_and_external_assets():
     assert extract_same_origin_assets(
         "http://192.0.2.1/", '<link href="/style.css"><script src="https://x/a.js">'
     ) == ["http://192.0.2.1/style.css"]
+
+
+def test_g0401_archaeology_skips_routes_outside_the_read_only_dictionary():
+    assert classify_route("/jabout") == "read-only"
+    assert classify_route("/jconfig_save") == "provisioning-mutation"
+    assert classify_route("/unknown") == "unknown"
+
+    calls: list[str] = []
+
+    def opener(request, timeout):
+        calls.append(request.full_url)
+        raise AssertionError("a skipped route must not be fetched")
+
+    report = run_archaeology(
+        "http://192.0.2.1/",
+        routes=("/jconfig_save", "/unknown"),
+        opener=opener,
+    )
+
+    assert calls == []
+    assert [item["category"] for item in report["routes"]] == [
+        "provisioning-mutation",
+        "unknown",
+    ]
+    assert all(item["skipped"] for item in report["routes"])
+    assert report["mutations_attempted"] is False

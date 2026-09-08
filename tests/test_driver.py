@@ -131,3 +131,27 @@ def test_driver_refuses_to_background_launch_the_official_app():
 
     with pytest.raises(RuntimeError, match="must already be in the foreground"):
         driver.launch()
+
+
+def test_driver_requires_the_verified_dashboard_activity():
+    class FakeDevice:
+        def __init__(self, activity):
+            self.activity = activity
+
+        def app_current(self):
+            return {
+                "package": "com.chamberlain.android.liftmaster.myq",
+                "activity": self.activity,
+            }
+
+    settings = SimpleNamespace(
+        package_name="com.chamberlain.android.liftmaster.myq",
+        dashboard_activity="com.chamberlain.myq.main.HomeTabsActivity",
+    )
+    driver = MyQDriver(settings)
+    driver._device = FakeDevice(".HomeTabsActivity")
+    driver.launch()
+
+    driver._device = FakeDevice("com.chamberlain.myq.main.LoginActivity")
+    with pytest.raises(RuntimeError, match="must already be in the foreground"):
+        driver.launch()

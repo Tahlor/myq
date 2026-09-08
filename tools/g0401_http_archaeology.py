@@ -21,12 +21,34 @@ EVIDENCE_ROUTES = (
     "/start.html",
     "/jscan_results",
 )
+READ_ONLY_ROUTES = frozenset(EVIDENCE_ROUTES)
+_MUTATING_ROUTE_MARKERS = (
+    "config_save",
+    "connect_serial",
+    "provision",
+    "factory_reset",
+    "pair",
+    "submit",
+    "reset",
+    "save",
+)
 MAX_BODY_BYTES = 256 * 1024
 MAX_ASSETS = 32
 MAX_CANDIDATES = 200
 _PATH_RE = re.compile(r"(?<![A-Za-z0-9])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+")
 _ASSET_RE = re.compile(r"(?:src|href)\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE)
 _CSS_URL_RE = re.compile(r"url\(\s*['\"]?([^'\")]+)", re.IGNORECASE)
+
+
+def classify_route(route: str) -> str:
+    """Classify a fixed route before any network request is made."""
+
+    path = urllib.parse.urlsplit(route).path.lower()
+    if path in READ_ONLY_ROUTES:
+        return "read-only"
+    if any(marker in path for marker in _MUTATING_ROUTE_MARKERS):
+        return "provisioning-mutation"
+    return "unknown"
 
 
 def _same_origin(left: str, right: str) -> bool:
@@ -153,9 +175,22 @@ def run_archaeology(
     for route in routes:
         if not route.startswith("/") or "?" in route:
             raise ValueError(f"route is not a fixed read-only path: {route!r}")
+        category = classify_route(route)
+        if category != "read-only":
+            route_records.append(
+                {
+                    "path": route,
+                    "category": category,
+                    "skipped": True,
+                    "reason": "route is not in the evidence-backed read-only dictionary",
+                }
+            )
+            continue
         url = urllib.parse.urljoin(base, route)
         response = fetch_read_only(url, headers=headers, timeout=timeout, opener=opener)
-        route_records.append(_public_record(route, response))
+        route_record = _public_record(route, response)
+        route_record["category"] = category
+        route_records.append(route_record)
         if response.get("status") != 200 or not _same_origin(base, url):
             continue
         content_type = str(response.get("content_type", "")).lower()

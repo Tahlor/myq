@@ -40,12 +40,14 @@ The setup JavaScript is useful route evidence but not proof that a route is
 safe or live. jconfig_save and jconnect_serial are provisioning/configuration
 mutations and are not called. No Wi-Fi configuration was submitted.
 
-The next #9 implementation item is a bounded route-archaeology helper for
-HEAD/GET against this evidence-backed dictionary. It must record only status,
-content type, length, redirect/server metadata, and sanitized strings; it must
-not fuzz, submit forms, or call a route merely because a word such as save or
-connect appears in a script. Until that helper exists, retain route output in
-ignored local captures and use only the existing GET-only setup capture tool.
+The bounded route-archaeology helper performs GET against this evidence-backed
+dictionary and same-origin assets:
+
+    python tools/g0401_http_archaeology.py http://<g0401-ip>/ --host-header setup.myqdevice.com --out captures/lan/http-archaeology
+
+It records only status, content type, length, redirect/server metadata, and
+sanitized strings; it does not fuzz, submit forms, or call a route merely
+because a word such as save or connect appears in a script.
 
 ## BLE boundary
 

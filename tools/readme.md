@@ -4,9 +4,22 @@ Raw captures belong under ignored captures/ and must not be committed. These
 tools are observation/parsing aids; none is a production cloud or garage
 command implementation.
 
-The next #9 implementation items are a secret-safe APK surface inventory and
-a HEAD/GET-only G0401 route archaeologist. They are intentionally not listed as
-available commands until their read-only behavior and tests are committed.
+## android_surface_inventory.py
+
+Read an exact decompiled AndroidManifest.xml and optional JADX source tree.
+It reports component/export/intent metadata plus sanitized call-site locations
+for internal action discovery. It never invokes an Android component.
+
+    python tools/android_surface_inventory.py <jadx-output>/resources/AndroidManifest.xml --jadx <jadx-output>/sources
+
+## g0401_http_archaeology.py
+
+GET-only normal-LAN route archaeology for the current G0401. It checks a small
+evidence-backed route dictionary, fetches same-origin static assets referenced
+by returned pages, classifies route candidates offline, and writes sanitized
+metadata. It never submits forms or calls provisioning mutations.
+
+    python tools/g0401_http_archaeology.py http://<g0401-ip>/ --host-header setup.myqdevice.com --out captures/lan/http-archaeology
 
 ## lan_probe.py
 

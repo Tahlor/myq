@@ -40,9 +40,12 @@ read-only inventory of:
 - app shortcuts, widgets, notification actions, and Auto/car components;
 - WorkManager/job names and action repository/ViewModel call sites.
 
-Use the decompiled manifest and JADX source for this inventory; the next #9
-implementation item is a secret-safe helper that reports the same metadata.
-Search for PendingIntent, ShortcutInfo, AppWidgetProvider, Intent, startService,
+Use the decompiled manifest and JADX source for this inventory:
+
+    python tools/android_surface_inventory.py <jadx-output>\resources\AndroidManifest.xml --jadx <jadx-output>\sources
+
+The helper reports only component metadata and signal locations. Search for
+PendingIntent, ShortcutInfo, AppWidgetProvider, Intent, startService,
 sendBroadcast, and open/close action methods. A manifest entry alone is not
 evidence that invocation is safe. Do not call unknown components by trial.
 

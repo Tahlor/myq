@@ -56,6 +56,7 @@ class Settings:
     adb_serial: str
     api_key: str
     package_name: str
+    dashboard_activity: str
     doors: tuple[DoorConfig, ...]
     host: str
     port: int
@@ -81,6 +82,9 @@ def load_settings() -> Settings:
         api_key=api_key,
         package_name=os.environ.get(
             "MYQ_PACKAGE", "com.chamberlain.android.liftmaster.myq"
+        ),
+        dashboard_activity=os.environ.get(
+            "MYQ_DASHBOARD_ACTIVITY", "com.chamberlain.myq.main.HomeTabsActivity"
         ),
         doors=doors,
         host=os.environ.get("MYQ_BIND", "0.0.0.0"),

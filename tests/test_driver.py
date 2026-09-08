@@ -115,3 +115,19 @@ def test_explicit_command_refuses_unstable_state_even_with_direct_selector():
     with pytest.raises(RuntimeError, match="Refusing open"):
         driver.command("Garage Door", "open")
     assert driver.clicked is False
+
+
+def test_driver_refuses_to_background_launch_the_official_app():
+    class FakeDevice:
+        def app_current(self):
+            return {"package": "com.android.launcher", "activity": ".Launcher"}
+
+    settings = SimpleNamespace(
+        package_name="com.chamberlain.android.liftmaster.myq",
+        dashboard_activity="com.chamberlain.myq.main.HomeTabsActivity",
+    )
+    driver = MyQDriver(settings)
+    driver._device = FakeDevice()
+
+    with pytest.raises(RuntimeError, match="must already be in the foreground"):
+        driver.launch()

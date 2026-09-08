@@ -43,8 +43,26 @@ class MyQDriver:
 
     def launch(self) -> None:
         d = self.connect()
-        d.app_start(self.settings.package_name, stop=False)
-        time.sleep(1.0)
+        current = self._current_app(d)
+        if current.get("package") == self.settings.package_name:
+            return
+        raise RuntimeError(
+            "official myQ must already be in the foreground; use the user-facing "
+            f"{self.settings.dashboard_activity} action before reading or commanding"
+        )
+
+    @staticmethod
+    def _current_app(device: Any) -> dict[str, str]:
+        try:
+            current = device.app_current()
+        except Exception:
+            return {}
+        if not isinstance(current, dict):
+            return {}
+        return {
+            "package": str(current.get("package") or ""),
+            "activity": str(current.get("activity") or ""),
+        }
 
     def hierarchy(self) -> str:
         return self.connect().dump_hierarchy(compressed=False)

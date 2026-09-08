@@ -20,6 +20,7 @@ dev = ["pytest>=8,<9"]
 [project.scripts]
 myq-bridge = "myq_bridge.api:main"
 myq-cloud = "myq_bridge.cloud_cli:main"
+myq-watchdog = "myq_bridge.watchdog:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

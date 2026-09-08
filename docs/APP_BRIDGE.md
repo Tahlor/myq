@@ -90,7 +90,12 @@ stores only normalized state plus an epoch timestamp and never stores or
 returns notification bodies. It is advisory, stale-aware, and never used as
 sole command authorization; accessibility/UIAutomator remains authoritative.
 Notification access has not been enabled or runtime-validated in this
-unattended run and requires a future user-visible settings step.
+unattended run. The minimal owner-visible validation is: on the S7MAX open
+Android Settings -> Notifications -> Notification access, enable “myQ LAN
+Bridge notifications”, return to the bridge, and read `/status` without
+sending a garage command. A natural myQ notification can then be correlated
+with the normalized `notification_state`; if no notification arrives, the
+side-channel remains unavailable and the app read path stays authoritative.
 
 ## Recovery/watchdog
 

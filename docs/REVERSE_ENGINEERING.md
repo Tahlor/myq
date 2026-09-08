@@ -54,10 +54,10 @@ MyQ.
 
 ## Notification state
 
-The native bridge can optionally listen only to notifications posted by the
-official myQ package. It records normalized state and timestamp metadata, not
-notification bodies. Notification state is advisory and stale-aware; it cannot
-authorize a command and does not replace a fresh app/sensor read.
+A future #9 notification driver may listen only to notifications posted by the
+official myQ package. It must record normalized state and timestamp metadata,
+not notification bodies. Notification state is advisory and stale-aware; it
+cannot authorize a command and does not replace a fresh app/sensor read.
 
 ## Current clean-room client
 

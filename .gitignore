@@ -1,6 +1,7 @@
 # Local secrets / runtime
 .env
 *.local.json
+.local_agent_*
 config/doors.json
 config/cloud_session.json
 captures/

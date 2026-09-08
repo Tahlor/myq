@@ -91,8 +91,8 @@ Bring the official dashboard to the foreground before protected reads. Copy
 `config/doors.example.json` to ignored `config/doors.json` and calibrate only
 read-only state selectors first. Every explicit action requires matching
 confirmation, a stable observed pre-state, one request at most, and a fresh
-verified post-state. The notification side-channel is advisory and never
-authorizes a command by itself.
+verified post-state. The planned notification side-channel is advisory and
+must never authorize a command by itself.
 
 ## Experimental tools and hygiene
 

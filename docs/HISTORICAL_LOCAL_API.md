@@ -1,5 +1,9 @@
 # Historical local MyQ API evidence
 
+This is an archive, not an active priority order. Issue #9 may use it only as
+context for its evidence-driven normal-LAN software lane; the official-app
+Superbox bridge remains the production baseline.
+
 This is a lead for Track B2, **not** proof that the owner's current integrated Wi-Fi opener behaves the same way.
 
 In January 2020, McAfee Advanced Threat Research (now Trellix) published reverse-engineering work on the older Chamberlain **myQ Smart Garage Hub**. Their device:
@@ -14,9 +18,11 @@ Reference: https://www.trellix.com/blogs/research/we-be-jammin-bypassing-chamber
 
 ## Why this matters to our software-only project
 
-It disproves the broad assumption that MyQ devices have *never* had a local API. Before investing in DNS/TLS/MQTT redirection, test the confirmed current opener for a surviving or evolved local HTTP setup surface.
+It disproves the broad assumption that MyQ devices have *never* had a local
+API. It is a historical hypothesis for comparison with the confirmed current
+opener, not a reason to enter setup mode or prioritize local hardware work.
 
-For the current opener, after positively identifying its LAN IP:
+If #9 schedules a current-opener comparison after the read-only baseline:
 
 1. probe TCP 80 and 443 explicitly;
 2. if 80 answers, issue only read-only `GET /`, `GET /start.html`, `HEAD`, and `OPTIONS` first;

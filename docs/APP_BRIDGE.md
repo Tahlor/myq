@@ -83,15 +83,14 @@ bridge component, preserves other enabled services, starts the visible bridge
 activity, and verifies both enabled and bound state. It does not change root,
 debug, su, or system-image security properties.
 
-## Optional notification side-channel
+## Planned notification side-channel
 
-The native app includes a notification listener that accepts only notifications
-from the official myQ package. It stores normalized state and an epoch timestamp
-in memory and exposes it as notification_state in status. It does not store or
-return notification bodies. State is advisory, stale-aware, and never used as
-sole command authorization. The user must explicitly enable notification access
-in Android settings; if it is unavailable, accessibility/UIAutomator remains
-authoritative.
+The #9 notification-driver candidate should accept only notifications from the
+official myQ package, normalize state plus an epoch timestamp, and keep bodies
+out of logs and responses. It must be advisory, stale-aware, and never used as
+sole command authorization. Until that listener and its read-only tests exist,
+accessibility/UIAutomator remains authoritative; enabling notification access
+is a future user-visible step, not an unattended action.
 
 ## Recovery/watchdog
 
@@ -103,9 +102,10 @@ HomeTabsActivity to the foreground remains a user-facing action; the watchdog
 must not background-navigate myQ, send a garage command, or automatically fail
 over after an ambiguous mutation.
 
-Use the Python watchdog documented in LIVE_RUNBOOK.md for scheduled checks. A
-full-device reboot validation is still a user-visible Superbox operation and
-should be scheduled only when it will not interrupt another project.
+Any future watchdog must follow the same scoped checks; no watchdog may
+background-navigate myQ or send a garage command. A full-device reboot
+validation is still a user-visible Superbox operation and should be scheduled
+only when it will not interrupt another project.
 
 ## Current unknowns
 

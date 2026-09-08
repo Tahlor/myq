@@ -12,6 +12,15 @@ for internal action discovery. It never invokes an Android component.
 
     python tools/android_surface_inventory.py <jadx-output>/resources/AndroidManifest.xml --jadx <jadx-output>/sources
 
+## android_sdk_surface_audit.py
+
+Audit the exact APK's selected smali surfaces without invoking an Android
+component. It separates dashboard navigation markers from the bundled v6
+device transport and reports only counts, method names, and a conclusion. A
+transport body type is an audit lead, not permission to invoke a command:
+
+    python tools/android_sdk_surface_audit.py captures/apk/smali-classes3-20260907 --dashboard captures/apk/smali-classes2-20260907/com/chamberlain/myq/main/HomeTabsActivity.smali --app-root captures/apk/smali-classes2-20260907/com/chamberlain/myq
+
 ## g0401_http_archaeology.py
 
 GET-only normal-LAN route archaeology for the current G0401. It checks a small

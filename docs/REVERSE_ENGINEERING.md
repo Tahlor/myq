@@ -43,8 +43,7 @@ notification state and does not attempt to fire the official app's
 
 ## UI-free invocation investigation
 
-The exact installed APK and runtime package metadata still need a complete,
-read-only inventory of:
+The exact installed APK still needs a complete manifest/JADX inventory of:
 
 - exported activities, services, receivers, and providers;
 - deep links and intent filters;
@@ -59,6 +58,20 @@ The helper reports only component metadata and signal locations. Search for
 PendingIntent, ShortcutInfo, AppWidgetProvider, Intent, startService,
 sendBroadcast, and open/close action methods. A manifest entry alone is not
 evidence that invocation is safe. Do not call unknown components by trial.
+
+The bounded smali audit has now separated the dashboard from the internal
+transport surface:
+
+    python tools/android_sdk_surface_audit.py <smali-classes3> --dashboard <smali-classes2>/com/chamberlain/myq/main/HomeTabsActivity.smali --app-root <smali-classes2>/com/chamberlain/myq
+
+For the ignored myQ 5.243.1.73243 extraction, `HomeTabsActivity` contained 17
+ordinary `startActivity` call lines, no service/broadcast/PendingIntent lines,
+and no direct operation-invocation marker. The bundled SDK's selected v6
+transport file contained one method whose signature accepts a VGDOS service
+body type and 21 v6 service-dispatch lines. The selected app tree had no direct
+reference to the wrapper class. These are static leads only: they do not
+establish a safe UI-free command entry point, and runtime validation was not
+performed.
 
 Any discovered primitive must be classified as read-only, user-visible, or
 mutating before runtime use. For a mutating primitive, retain the bridge's

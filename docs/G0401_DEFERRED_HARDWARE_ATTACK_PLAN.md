@@ -12,7 +12,10 @@ If the mandatory software-exhaustion gate eventually passes, this archive
 describes how to investigate a durable local control/state path for the
 owner's Chamberlain MYQ-G0401 without adding permanent garage-opener hardware.
 
-The cloud TLS-PSK path is now understood well enough to **demote PSK extraction as the primary strategy**. The better question is: where does a decrypted cloud command cross from the network MCU into the PIC/RF side, and can we observe or invoke that boundary locally?
+This archive records that PSK extraction may not be necessary if later-approved
+evidence identifies where a decrypted cloud command crosses from the network
+MCU into the PIC/RF side. No hardware strategy is active before the software
+gate.
 
 This is dormant execution context, not the current local-agent queue. Do not
 restart from a generic audit or use it before the software gate.
@@ -291,7 +294,8 @@ If `CP0 = ON` (protected):
 
 # Phase H6 — 6220N / RTL8720CS firmware and external 8 MiB flash
 
-This is the second-highest software target after passive inter-MCU capture.
+This is a possible post-gate software target after an approved passive
+inter-MCU observation.
 
 The Fn-Link module has a GD25Q64 8 MiB flash according to its module documentation. It is a plausible location for:
 
@@ -474,7 +478,7 @@ PIC ICSP:
 OTA IMAGE: recovered/no/unknown
 RF SDR: sensor/opener/not attempted
 
-BEST NEXT STEP: <one concrete experiment>
+NEXT POST-GATE STEP: <one concrete experiment>
 PRODUCTION STATE PRESERVED: yes/no
 COMMITS: <sha(s) or none>
 RAW CAPTURES: local only

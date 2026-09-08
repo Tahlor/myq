@@ -12,7 +12,12 @@ If the mandatory software-exhaustion gate eventually passes, this archive
 describes how to investigate a reliable local control/status path for the
 owner's Chamberlain MYQ-G0401 without adding replacement hardware.
 
-The cloud-emulator track is no longer the best first attack. Live testing proved that the G0401's outbound TCP/8883 connection negotiates TLS 1.2 with `TLS_PSK_WITH_AES_128_CBC_SHA`. A fake certificate, DNS redirect, or generic MQTT broker therefore cannot replace Chamberlain by itself. Recovering the per-device PSK may eventually be useful, but it should be treated as an opportunistic consequence of firmware/NVM acquisition rather than the project’s primary bet.
+This archive does not select a hardware or emulator priority. Live testing
+proved that the G0401's outbound TCP/8883 connection negotiates TLS 1.2 with
+`TLS_PSK_WITH_AES_128_CBC_SHA`. A fake certificate, DNS redirect, or generic
+MQTT broker therefore cannot replace Chamberlain by itself. Recovering the
+per-device PSK may eventually be useful, but only as a post-gate consequence
+of firmware/NVM evidence.
 
 If activated, the fallback route works downward toward the physical RF
 boundary:
@@ -23,7 +28,7 @@ Broadlink / local API
         v
   G0401 Wi-Fi MCU
         |
-        |  <-- highest-value boundary to observe
+        |  <-- historical boundary of interest if this archive is activated
         v
   RF/control subsystem
         |
@@ -212,7 +217,7 @@ Record the mapping as local photos/notes and post only generic pad labels or boa
 
 ---
 
-# Phase 3 — passive internal signal capture (highest-value live phase)
+# Phase 3 — passive internal signal capture (post-gate candidate phase)
 
 This phase is intentionally **listen-only**. Do not connect a USB-TTL TX lead to the board. A logic analyzer/high-impedance scope input is preferred for discovery.
 
@@ -480,7 +485,8 @@ software-exhaustion gate is approved later, a hands-on agent can use this order:
 4. power-off continuity-map test pads to 6220N-IS log UART, communication UART and SWD;
 5. passive boot/log-UART capture;
 6. passive communication-UART capture correlated with one known action;
-7. if UART reveals the internal RF command boundary, prioritize decoding it immediately;
+7. if UART reveals the internal RF command boundary, record and decode it before
+   considering any deeper physical step;
 8. otherwise try non-destructive SWD identification/read;
 9. pursue natural OTA firmware capture in parallel;
 10. only if still blocked, plan external SPI-flash acquisition;
@@ -574,7 +580,7 @@ PSK/8883:
 - cloud emulator remains: blocked / newly actionable
 
 COMMITS: <sha(s) or none>
-NEXT HIGHEST-VALUE TEST: <one sentence>
+NEXT POST-GATE STEP: <one sentence>
 BLOCKERS/TOOLS NEEDED: <short list>
 ```
 

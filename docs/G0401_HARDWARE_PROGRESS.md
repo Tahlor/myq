@@ -22,8 +22,21 @@ detailed execution order and safety boundaries are in
 - Android reported version 12 / `armeabi-v7a`; the official myQ app and native
   bridge packages were installed, and both expected accessibility services were
   enabled. No garage command, reset, pairing change, or UI action was issued.
+- A targeted literal search of the captured current-app decompile found no
+  `6220N`, `RTL8720`, `GD25Q64`, `Si4432`, `UART_LOG`, or exact current-device
+  firmware-host strings. It did reproduce the already-known setup strings
+  (`setup.myqdevice.com` and the `jconfig_save`/`jscan_results`/
+  `jconnect_serial` route names). Because the app is obfuscated and does not
+  contain the G0401 firmware, this is only a bounded negative cross-check, not
+  evidence that the hardware boundary is absent.
 
 The production software baseline is therefore **PASS** and was preserved.
+
+The public reference for the first physical comparison is the one-page
+[FCC HBW9545 internal photo, document 4615732](https://fccid.io/HBW9545/Internal-Photos/Internal-Photo-4615732).
+The remote handoff specifically calls for a macro photograph of the actual
+board's central QFN and nearby test-pad/header clusters rather than treating
+that public image as an exact pin map.
 
 ## Hardware handoff
 

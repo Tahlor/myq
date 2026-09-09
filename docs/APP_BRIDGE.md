@@ -137,17 +137,21 @@ background-navigate myQ or send a garage command. A full-device reboot
 validation is still a user-visible Superbox operation and should be scheduled
 only when it will not interrupt another project.
 
-## Current unknowns
+## Current status and remaining unknowns
 
-- whether MyQ Button Preferences exposes Single Tap on the owner's account;
-- whether an official internal intent/service/widget/notification action can
-  replace accessibility clicking;
-- whether native notification access is enabled and produces door-specific
-  events;
-- whether the bridge/accessibility binding survives a complete Superbox reboot;
-- whether a newer APK can reuse the authenticated session without a new
-  login;
-- which explicit dashboard action selector can be safely calibrated.
+- **PROVEN:** Single Tap semantics exist in the exact APK.
+- **PROVEN:** UI-free internal SDK dispatch replaces accessibility clicking as
+  the preferred official-app action path; both open and close reached the final
+  Chamberlain wrappers in a network-suppressed live dry-run.
+- **PROVEN:** native notification access is enabled and the listener is live;
+  natural door-event correlation is still pending.
+- accessibility/UIAutomator remain fallback drivers.
+- whether the bridge/accessibility binding survives a complete Superbox reboot
+  is still pending.
+- whether a newer APK can reuse the authenticated session without a new login
+  is still pending.
+- one explicitly authorized unsuppressed internal command with physical and
+  post-state verification is still pending.
 
 Direct-cloud refresh/read/command evidence is preserved for comparison only.
 It is not the production bridge and does not change the software-exhaustion

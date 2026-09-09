@@ -46,9 +46,14 @@ oracle and never changes the production baseline.
 Record each result in a sanitized note and link it from the #4 handoff. Work
 down this list before considering either deferred hardware archive.
 
-### 1. Official APK/runtime: UI-free internal dispatch
+### 1. Official APK/runtime: UI-free internal dispatch ? PROVEN
 
-Pull and decompile the exact installed official APK:
+The current exact APK has a proven network-suppressed internal dispatch path.
+Preserve it as the default official-app fallback and regression-test it after
+app updates with `scripts/invoke_myq_internal_action.ps1 -Action probe`. Do not
+promote a new APK until both open and close wrappers are intercepted again.
+
+Pull and decompile the exact installed official APK when revalidating:
 
 ```powershell
 $dir = .\scripts\pull_myq_apks.ps1
@@ -66,18 +71,21 @@ shown a focus-loss ANR, so the dashboard path remains the foreground baseline.
 
 ### 2. Keep four app-bridge drivers available
 
-1. **Accessibility + Single Tap:** use the native package-scoped bridge, a
+1. **Internal SDK dispatch (primary official-app path):** use the validated
+   Frida 17.9.0 harness. Default probe mode suppresses final network wrappers;
+   live mode requires exact action confirmation and post-state verification.
+2. **Accessibility + Single Tap:** use the native package-scoped bridge, a
    stable state selector, and one explicit tap only after an authorized future
    test has a known state and physical verification plan. Never use a blind
    toggle as a probe.
-2. **UIAutomator fallback:** retain `src/myq_bridge/` for hierarchy dumps,
+3. **UIAutomator fallback:** retain `src/myq_bridge/` for hierarchy dumps,
    selector calibration, and a second driver when the native service is not
    enough. It must remain foreground-only and fail closed on unknown state.
-3. **Notification side-channel:** the native bridge has a package-filtered
+4. **Notification side-channel:** the native bridge has a package-filtered
    listener that stores normalized state/timestamps only. It is advisory,
    stale-aware, cannot authorize an action, and must be compared with a fresh
    app read. Notification access remains a future user-visible validation step.
-4. **Screenshot/vision driver:** add a read-only screenshot/vision observer
+5. **Screenshot/vision driver:** add a read-only screenshot/vision observer
    for layouts that expose state visually but not reliably in the accessibility
    tree. Keep raw screenshots ignored and require independent state confirmation
    before any future command.

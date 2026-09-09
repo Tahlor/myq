@@ -7,7 +7,7 @@ worked.
 ## Current gate
 
 ```text
-PRODUCTION_BASELINE: official MyQ Android app on SuperBOX S7MAX
+PRODUCTION_BASELINE: official MyQ Android internal SDK dispatch on SuperBOX S7MAX
 SOFTWARE_EXHAUSTED: no
 HARDWARE_NOW_JUSTIFIED: no
 ```
@@ -31,9 +31,9 @@ The deferred plans are archives, not an active queue:
    only to #9/#4 for current work. Closed issue records are not execution
    instructions, and `pymyq` is absent from runtime dependencies.
 2. **Baseline gate.** The official Android app remains installable and
-   authenticated on the Superbox; the native bridge, Accessibility + Single
-   Tap path, UIAutomator fallback, notification side-channel, and screenshot/
-   vision observer are documented with fail-closed state handling.
+   authenticated on the Superbox; exact-APK internal SDK dispatch is the
+   default proven command path, while Accessibility/Single Tap, UIAutomator,
+   notification state, and screenshot/vision remain fail-closed fallbacks.
 3. **Runtime-recovery gate.** Exact-APK internal dispatch, authenticated
    Android backup/clone, alternate myQ Community/Craftsman code oracles, and
    ReDroid as a spare host have been checked or have a dated blocker.
@@ -64,9 +64,13 @@ APK's `CHUB` BLE path is commissioning/metadata oriented, with no proven
 operation command. Historical `myq_aes`/NVM and MCU-parser work remains
 historical evidence only.
 
-The official-app/Superbox path is the working production baseline. A guarded
-current-2026 direct-cloud one-off has value as experimental evidence, but does
-not satisfy the production or software-exhaustion gate by itself.
+The official-app/Superbox **internal SDK** path is the working software
+baseline: its open and close paths have both been dynamically proven through
+the final Chamberlain v6 wrappers with network suppression. Physical live
+actuation through that new path is still pending owner-observed validation.
+Accessibility/UI automation is now fallback. A guarded current-2026 direct-
+cloud one-off remains experimental evidence and does not satisfy the local-
+control or software-exhaustion gate by itself.
 
 ## What counts as completion
 

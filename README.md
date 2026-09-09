@@ -16,15 +16,28 @@ garage-side hardware.
 - Hardware is deferred. It becomes eligible only when #9 explicitly records
   both `SOFTWARE_EXHAUSTED=yes` and `HARDWARE_NOW_JUSTIFIED=yes`.
 
-The production baseline is the official myQ Android app on the rooted
-SuperBOX S7MAX, reached through the package-scoped `android_bridge/` service:
+The **current default proven software path** keeps the official authenticated
+myQ Android process on the rooted SuperBOX S7MAX but bypasses UI clicking. A
+Frida 17.9.0 harness invokes the official app's own internal garage API. A live
+dry-run on 2026-09-09 found exactly one `devices.a0` garage in `CLOSED` state,
+reached both Chamberlain `open` and `close` v6 wrappers, and suppressed both
+before the network layer. No physical movement occurred.
 
 ```text
-home automation -> Superbox bridge -> official myQ Android app -> Chamberlain -> G0401
+home automation -> Superbox -> official myQ process/internal SDK -> Chamberlain -> G0401
 ```
 
-Direct cloud is experimental/current-2026 fallback-oracle tooling only. A
-successful one-off read or command does not promote it to production. `pymyq`
+Provider preference is now explicit:
+
+1. **true local / no Chamberlain cloud** ? preferred end state and active research target;
+2. **official-app internal SDK dispatch** ? default proven fallback;
+3. **Accessibility/Single Tap or UIAutomator** ? retained compatibility fallback;
+4. **Linux-native direct cloud** ? bounded fallback/oracle work, not production yet.
+
+The packaged internal dry-run is `scripts/invoke_myq_internal_action.ps1`; it
+requires the validated Frida 17.9.0 pair and defaults to network-suppressed
+probe mode. Live actuation additionally requires `-Execute` and an exactly
+matching `-ConfirmAction`. Direct cloud remains secondary research. `pymyq`
 is permanently deprecated; see [docs/PYMYQ_DEPRECATION.md](docs/PYMYQ_DEPRECATION.md).
 
 ## #9 software-exhaustion order
@@ -32,10 +45,8 @@ is permanently deprecated; see [docs/PYMYQ_DEPRECATION.md](docs/PYMYQ_DEPRECATIO
 Before hardware, #9 must evaluate and record an outcome for every credible
 software route:
 
-1. Audit the exact official APK/runtime for UI-free internal command dispatch:
-   exported activities, deep links, shortcuts/widgets, intent paths, and
-   action-call sites. Read-only static evidence comes first; do not invoke an
-   unknown component against the real opener.
+1. Preserve and regression-test the proven official-app internal SDK dispatch;
+   treat Accessibility/UI automation as fallback, not the primary command path.
 2. Keep the official-app bridge usable: Accessibility plus a guarded Single
    Tap path, the Python/UIAutomator fallback, the notification state
    side-channel, and a screenshot/vision third driver.

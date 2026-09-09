@@ -53,46 +53,57 @@ not an externally callable or production-safe action primitive.
 
 ## UI-free invocation investigation
 
-The exact installed APK now has a direct binary-manifest inventory plus an
-app-package smali scan. JADX output was not available, so repository/method
-names remain obfuscated where the smali extraction does not preserve them.
-Run the inventory directly against the exact APK when reproducing the check:
+This lane is now **PROVEN in network-suppressed runtime testing** against the
+exact installed myQ 5.243.1.73243 APK. Static tracing plus Frida 17.9.0 reached
+the real dashboard actuation chain and the official v6 service wrappers.
 
-    python tools/android_surface_inventory.py <exact.apk> --jadx <smali-app-root>
+The live chain is:
 
-The helper reports only component metadata and signal locations. A manifest
-entry alone is not evidence that invocation is safe. Do not call unknown
-components by trial.
+```text
+DeviceView single tap
+  -> dashboard f1.n0/F/B/G0
+  -> DevicePollerApiImpl
+  -> garage model myq.sdk.data.model.devices.a0 (extends devices.p)
+  -> communication.method.k.j(...) for OPEN
+  -> communication.method.k.c(...) for CLOSE
+  -> Chamberlain v6 default wrappers `f` (open) / `a` (close)
+```
 
-The bounded smali audit has now separated the dashboard from the internal
-transport surface:
+On 2026-09-09 the packaged dry-run refreshed devices through the official
+`DeviceApiImpl.M(activeAccountId, null)` read path, found exactly one garage in
+`CLOSED` state, invoked both internal action methods, and intercepted both
+final wrappers before they reached the network. It emitted `suppressed=open`
+and `suppressed=close`; no garage movement or outbound command occurred.
 
-    python tools/android_sdk_surface_audit.py <smali-classes3> --dashboard <smali-classes2>/com/chamberlain/myq/main/HomeTabsActivity.smali --app-root <smali-classes2>/com/chamberlain/myq
+The preserved harness is:
 
-For the ignored myQ 5.243.1.73243 extraction, `HomeTabsActivity` contained 17
-ordinary `startActivity` call lines, no service/broadcast/PendingIntent lines,
-no shortcut/widget markers, and no direct operation-invocation marker. The
-app-package PendingIntent references were confined to the notification service;
-they target notification presentation/snooze handling, not a garage action.
-The bundled SDK's selected v6 transport file contained one method whose
-signature accepts a VGDOS service body type and 21 v6 service-dispatch lines.
-The selected app tree had no direct reference to the wrapper class. These are
-static leads only: they do not establish a safe UI-free command entry point,
-and no internal action was invoked during the live validation.
+```powershell
+.\scripts\invoke_myq_internal_action.ps1 -Action probe
+```
 
-Any discovered primitive must be classified as read-only, user-visible, or
-mutating before runtime use. For a mutating primitive, retain the bridge's
-stable-state, explicit-confirmation, one-action, and fresh-post-state guards.
-Never fail over to another driver after a mutating request may have reached
-MyQ.
+Safety contract:
+
+- Frida 17.9.0 is the only validated attach pair for this Superbox;
+- default mode hooks/suppresses the final open/close wrappers;
+- exactly one garage must exist and state must be `OPEN` or `CLOSED`;
+- same-state actions are no-ops;
+- live mode requires `-Execute` plus matching `-ConfirmAction`;
+- a mutation is sent at most once; only read-only refreshes are used afterward;
+- an ambiguous/unverified mutation explicitly says **do not retry**.
+
+This is the default proven official-app command mechanism. Accessibility and
+UIAutomator remain useful fallbacks but are no longer the preferred command
+path. One owner-observed unsuppressed physical transition is still pending
+before calling the live mutation path physically verified.
 
 ## Notification state
 
 The native bridge contains a package-filtered listener that records normalized
 state and timestamp metadata, not notification bodies. It is advisory and
 stale-aware; it cannot authorize a command and does not replace a fresh
-app/sensor read. Notification access still needs a future user-visible enable
-and runtime validation.
+app/sensor read. Notification access is enabled on the Superbox and the listener is live. It
+remains advisory; a natural door event still needs correlation if we want to
+use it as an independent state side-channel.
 
 ## Current clean-room client
 

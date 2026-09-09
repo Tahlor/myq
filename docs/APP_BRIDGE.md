@@ -52,6 +52,28 @@ credentials or raw UI artifacts:
   not-responding alert, so it is treated as a live control surface rather than
   a navigation element. The alert was dismissed without a second device tap.
 
+On 2026-09-08, an unattended read-only validation against the reachable
+Superbox found:
+
+- ADB identified the S7MAX as Android 12/API 31 with `armeabi-v7a` support;
+- `accessibility_enabled=1`, the bridge component was listed in the enabled
+  services, and `dumpsys accessibility` showed the labeled bridge service in
+  `Bound services` alongside the pre-existing TV accessibility service;
+- an explicit `am start -W` of
+  `com.chamberlain.myq.main.HomeTabsActivity` returned `Status: ok`, and the
+  activity/window manager reported it as resumed and focused;
+- unauthenticated `/health` returned `ok`; authenticated `/status` returned
+  `online` for the official package with one configured door observed as
+  `closed`; `/debug/nodes` returned 42 nodes, including 41 with resource IDs;
+- the secure notification-listener setting and notification manager both
+  omitted `BridgeNotificationListenerService`; `/status` consequently had no
+  `notification_state` field; and
+- `myq-watchdog --once --dry-run` completed at the authenticated status stage
+  with HTTP 200, `healthy=true`, and no recovery requested.
+
+No secure settings, notification access, app installation, reboot, tap, or
+garage endpoint was changed or invoked during this check.
+
 A full Superbox reboot, native accessibility rebind after reboot, and
 notification-access validation remain pending. No command should be used to
 test those lifecycle paths.
@@ -62,6 +84,9 @@ test those lifecycle paths.
     .\scripts\install_myq_superbox.ps1 -PackagePath C:\path\to\myq -AdbSerial $serial
     $key = .\scripts\build_install_android_bridge.ps1 -AdbSerial $serial | Select-Object -Last 1
     $headers = @{ 'X-API-Key' = $key }
+
+If `adb` is not on PATH, pass its executable explicitly to the connection
+helper with `-AdbPath`; the helper performs only ADB discovery/connect checks.
 
 Bring the official dashboard to the foreground through the companion
 Open myQ action or the verified HomeTabsActivity component. Then inspect:

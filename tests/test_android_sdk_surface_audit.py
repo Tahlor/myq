@@ -37,6 +37,7 @@ def test_audit_separates_dashboard_navigation_from_transport_body(tmp_path: Path
 
     assert report["dashboard"]["signals"]["start_activity_line_count"] == 1
     assert report["dashboard"]["direct_operation_invocation_signal"] is False
+    assert report["dashboard"]["signals"]["shortcut_or_widget_line_count"] == 0
     assert report["v6_transport"]["vgdo_service_body_method_names"] == ["l"]
     assert report["v6_transport"]["v6_service_dispatch_line_count"] == 1
     assert report["device_api_wrapper"]["device_interaction_reference_line_count"] == 1

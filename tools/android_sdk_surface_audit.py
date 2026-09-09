@@ -136,7 +136,11 @@ def audit_dashboard(path: Path | None, *, source_root: Path) -> dict[str, Any]:
         "shortcut_or_widget_line_count": sum(
             1
             for line in lines
-            if re.search(r"Shortcut|AppWidget|Widget", line, re.IGNORECASE)
+            if re.search(
+                r"ShortcutInfo|ShortcutManager|AppWidgetProvider|AppWidgetManager",
+                line,
+                re.IGNORECASE,
+            )
         ),
         "operation_term_line_count": sum(
             1

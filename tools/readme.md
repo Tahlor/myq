@@ -6,11 +6,12 @@ command implementation.
 
 ## android_surface_inventory.py
 
-Read an exact decompiled AndroidManifest.xml and optional JADX source tree.
-It reports component/export/intent metadata plus sanitized call-site locations
-for internal action discovery. It never invokes an Android component.
+Read an exact APK (including its binary AndroidManifest.xml), a decompiled
+AndroidManifest.xml, and an optional JADX/smali source tree. It reports
+component/export/intent metadata plus sanitized call-site locations for
+internal action discovery. It never invokes an Android component.
 
-    python tools/android_surface_inventory.py <jadx-output>/resources/AndroidManifest.xml --jadx <jadx-output>/sources
+    python tools/android_surface_inventory.py <exact.apk> --jadx <jadx-output>/sources
 
 ## android_sdk_surface_audit.py
 

@@ -11,12 +11,25 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import struct
+import zipfile
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
+RES_STRING_POOL_TYPE = 0x0001
+RES_XML_TYPE = 0x0003
+RES_XML_START_NAMESPACE_TYPE = 0x0100
+RES_XML_END_NAMESPACE_TYPE = 0x0101
+RES_XML_START_ELEMENT_TYPE = 0x0102
+RES_XML_END_ELEMENT_TYPE = 0x0103
+UTF8_FLAG = 0x00000100
+TYPE_STRING = 0x03
+TYPE_INT_DEC = 0x10
+TYPE_INT_HEX = 0x11
+TYPE_INT_BOOLEAN = 0x12
 SOURCE_SUFFIXES = {".java", ".kt", ".kts", ".smali", ".xml"}
 SIGNAL_PATTERNS: dict[str, re.Pattern[str]] = {
     "pending_intent": re.compile(r"\bPendingIntent\b"),
@@ -43,10 +56,178 @@ def _component_name(element: ElementTree.Element) -> str:
     return _android_attr(element, "name") or "<unnamed>"
 
 
-def inventory_manifest(path: Path) -> dict[str, Any]:
-    """Return sanitized component and intent metadata from a manifest."""
+def _read_length8(data: bytes, offset: int) -> tuple[int, int]:
+    first = data[offset]
+    offset += 1
+    if first & 0x80:
+        return ((first & 0x7F) << 7) | data[offset], offset + 1
+    return first, offset
 
-    root = ElementTree.parse(path).getroot()
+
+def _read_length16(data: bytes, offset: int) -> tuple[int, int]:
+    first = struct.unpack_from("<H", data, offset)[0]
+    offset += 2
+    if first & 0x8000:
+        second = struct.unpack_from("<H", data, offset)[0]
+        return ((first & 0x7FFF) << 16) | second, offset + 2
+    return first, offset
+
+
+def _binary_string_pool(data: bytes, chunk_offset: int) -> list[str]:
+    (
+        _chunk_type,
+        header_size,
+        chunk_size,
+        string_count,
+        _style_count,
+        flags,
+        strings_start,
+        _styles_start,
+    ) = struct.unpack_from("<HHI5I", data, chunk_offset)
+    if header_size < 28 or chunk_size > len(data) - chunk_offset:
+        raise ValueError("invalid Android string-pool chunk")
+    offsets_start = chunk_offset + header_size
+    strings_base = chunk_offset + strings_start
+    offsets = [
+        struct.unpack_from("<I", data, offsets_start + index * 4)[0]
+        for index in range(string_count)
+    ]
+    decoded: list[str] = []
+    for relative in offsets:
+        start = strings_base + relative
+        if flags & UTF8_FLAG:
+            _utf16_length, cursor = _read_length8(data, start)
+            byte_length, cursor = _read_length8(data, cursor)
+            raw = data[cursor : cursor + byte_length]
+            decoded.append(raw.decode("utf-8", errors="replace"))
+        else:
+            unit_length, cursor = _read_length16(data, start)
+            raw = data[cursor : cursor + unit_length * 2]
+            decoded.append(raw.decode("utf-16le", errors="replace"))
+    return decoded
+
+
+def _string_at(strings: list[str], index: int) -> str | None:
+    if index < 0 or index >= len(strings):
+        return None
+    return strings[index]
+
+
+def _typed_value(strings: list[str], raw_index: int, value_type: int, value: int) -> str:
+    raw = _string_at(strings, raw_index)
+    if raw is not None:
+        return raw
+    if value_type == TYPE_STRING:
+        return _string_at(strings, value) or ""
+    if value_type == TYPE_INT_BOOLEAN:
+        return "true" if value else "false"
+    if value_type == TYPE_INT_DEC:
+        return str(value if value < 0x80000000 else value - 0x100000000)
+    if value_type == TYPE_INT_HEX:
+        return f"0x{value:08x}"
+    return str(value)
+
+
+def _binary_attribute(
+    data: bytes, offset: int, strings: list[str]
+) -> tuple[str, str]:
+    namespace_index, name_index, raw_index = struct.unpack_from("<III", data, offset)
+    _value_size, _res0, value_type, value = struct.unpack_from(
+        "<HBBI", data, offset + 12
+    )
+    name = _string_at(strings, name_index) or "<unnamed>"
+    namespace = _string_at(strings, namespace_index)
+    key = f"{{{namespace}}}{name}" if namespace else name
+    return key, _typed_value(strings, raw_index, value_type, value)
+
+
+def _decode_binary_manifest(data: bytes) -> ElementTree.Element:
+    """Decode the metadata-bearing subset of Android's binary XML format."""
+
+    if len(data) < 8:
+        raise ValueError("AndroidManifest.xml is too short")
+    root_type, root_header_size, root_size = struct.unpack_from("<HHI", data, 0)
+    if root_type != RES_XML_TYPE or root_header_size < 8 or root_size > len(data):
+        raise ValueError("not an Android binary XML document")
+
+    strings: list[str] | None = None
+    element_root: ElementTree.Element | None = None
+    stack: list[ElementTree.Element] = []
+    offset = root_header_size
+    while offset + 8 <= root_size:
+        chunk_type, header_size, chunk_size = struct.unpack_from(
+            "<HHI", data, offset
+        )
+        if (
+            header_size < 8
+            or chunk_size < header_size
+            or offset + chunk_size > root_size
+        ):
+            raise ValueError("invalid Android XML chunk")
+        if chunk_type == RES_STRING_POOL_TYPE:
+            strings = _binary_string_pool(data, offset)
+        elif chunk_type in {
+            RES_XML_START_NAMESPACE_TYPE,
+            RES_XML_END_NAMESPACE_TYPE,
+        }:
+            pass
+        elif chunk_type == RES_XML_START_ELEMENT_TYPE:
+            if strings is None or header_size < 16:
+                raise ValueError("invalid Android XML element")
+            extension = offset + header_size
+            (
+                _namespace_index,
+                name_index,
+                attribute_start,
+                attribute_size,
+                attribute_count,
+                *_indexes,
+            ) = struct.unpack_from("<ii6H", data, extension)
+            if attribute_size < 20:
+                raise ValueError("invalid Android XML attribute size")
+            name = _string_at(strings, name_index) or "<unnamed>"
+            element = ElementTree.Element(name)
+            attributes_offset = extension + attribute_start
+            for index in range(attribute_count):
+                key, value = _binary_attribute(
+                    data, attributes_offset + index * attribute_size, strings
+                )
+                element.set(key, value)
+            if stack:
+                stack[-1].append(element)
+            else:
+                element_root = element
+            stack.append(element)
+        elif chunk_type == RES_XML_END_ELEMENT_TYPE and stack:
+            stack.pop()
+        offset += chunk_size
+
+    if element_root is None:
+        raise ValueError("Android binary XML contains no root element")
+    return element_root
+
+
+def _read_manifest_bytes(path: Path) -> bytes:
+    if zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as archive:
+            try:
+                return archive.read("AndroidManifest.xml")
+            except KeyError as exc:
+                raise ValueError("APK does not contain AndroidManifest.xml") from exc
+    return path.read_bytes()
+
+
+def _manifest_root(path: Path) -> ElementTree.Element:
+    data = _read_manifest_bytes(path)
+    try:
+        return ElementTree.fromstring(data)
+    except ElementTree.ParseError:
+        return _decode_binary_manifest(data)
+
+
+def _inventory_manifest_root(root: ElementTree.Element) -> dict[str, Any]:
+    """Return sanitized component and intent metadata from a manifest root."""
+
     application = root.find("application")
     components: list[dict[str, Any]] = []
     if application is not None:
@@ -99,6 +280,12 @@ def inventory_manifest(path: Path) -> dict[str, Any]:
         "package": _android_attr(root, "package") or None,
         "components": sorted(components, key=lambda item: (item["type"], item["name"])),
     }
+
+
+def inventory_manifest(path: Path) -> dict[str, Any]:
+    """Read text XML, binary XML, or an exact APK's embedded manifest."""
+
+    return _inventory_manifest_root(_manifest_root(path))
 
 
 def inventory_source_signals(source_root: Path, *, max_matches: int = 2000) -> list[dict[str, Any]]:
@@ -201,9 +388,13 @@ def build_report(manifest: Path, source_root: Path | None = None) -> dict[str, A
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Read-only Android manifest/JADX surface inventory"
+        description="Read-only Android manifest/APK/JADX surface inventory"
     )
-    parser.add_argument("manifest", type=Path)
+    parser.add_argument(
+        "manifest",
+        type=Path,
+        help="text/binary AndroidManifest.xml or an APK containing one",
+    )
     parser.add_argument("--jadx", type=Path, help="Optional JADX source directory")
     parser.add_argument("--output", type=Path, help="Optional JSON output path")
     args = parser.parse_args()

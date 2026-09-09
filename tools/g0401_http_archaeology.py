@@ -35,7 +35,9 @@ _MUTATING_ROUTE_MARKERS = (
 MAX_BODY_BYTES = 256 * 1024
 MAX_ASSETS = 32
 MAX_CANDIDATES = 200
-_PATH_RE = re.compile(r"(?<![A-Za-z0-9])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+")
+_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_/:<])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"
+)
 _ASSET_RE = re.compile(r"(?:src|href)\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE)
 _CSS_URL_RE = re.compile(r"url\(\s*['\"]?([^'\")]+)", re.IGNORECASE)
 

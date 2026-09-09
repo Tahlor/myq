@@ -41,23 +41,28 @@ command surface. The native bridge therefore consumes only normalized
 notification state and does not attempt to fire the official app's
 `PendingIntent`.
 
+The exact APK's binary manifest was also inventoried locally. It contains 59
+activities, 16 receivers, 23 services, and 7 exported components. The relevant
+exported application surfaces are `LoginActivity`, `SplashActivity`, and
+`HomeTabsActivity`; `SnoozeBroadcastReceiver` and `MyQMessagingService` are
+not exported. The bounded SDK audit found the internal v6 transport class
+`myq/sdk/common/misc/communication/method/k`, including one
+`vgdoservice/body` method and 21 v6-service dispatch references, but no direct
+dashboard operation invocation. This remains an internal implementation lead,
+not an externally callable or production-safe action primitive.
+
 ## UI-free invocation investigation
 
-The exact installed APK still needs a complete manifest/JADX inventory of:
+The exact installed APK now has a direct binary-manifest inventory plus an
+app-package smali scan. JADX output was not available, so repository/method
+names remain obfuscated where the smali extraction does not preserve them.
+Run the inventory directly against the exact APK when reproducing the check:
 
-- exported activities, services, receivers, and providers;
-- deep links and intent filters;
-- app shortcuts, widgets, notification actions, and Auto/car components;
-- WorkManager/job names and action repository/ViewModel call sites.
+    python tools/android_surface_inventory.py <exact.apk> --jadx <smali-app-root>
 
-Use the decompiled manifest and JADX source for this inventory:
-
-    python tools/android_surface_inventory.py <jadx-output>\resources\AndroidManifest.xml --jadx <jadx-output>\sources
-
-The helper reports only component metadata and signal locations. Search for
-PendingIntent, ShortcutInfo, AppWidgetProvider, Intent, startService,
-sendBroadcast, and open/close action methods. A manifest entry alone is not
-evidence that invocation is safe. Do not call unknown components by trial.
+The helper reports only component metadata and signal locations. A manifest
+entry alone is not evidence that invocation is safe. Do not call unknown
+components by trial.
 
 The bounded smali audit has now separated the dashboard from the internal
 transport surface:
@@ -66,12 +71,14 @@ transport surface:
 
 For the ignored myQ 5.243.1.73243 extraction, `HomeTabsActivity` contained 17
 ordinary `startActivity` call lines, no service/broadcast/PendingIntent lines,
-and no direct operation-invocation marker. The bundled SDK's selected v6
-transport file contained one method whose signature accepts a VGDOS service
-body type and 21 v6 service-dispatch lines. The selected app tree had no direct
-reference to the wrapper class. These are static leads only: they do not
-establish a safe UI-free command entry point, and runtime validation was not
-performed.
+no shortcut/widget markers, and no direct operation-invocation marker. The
+app-package PendingIntent references were confined to the notification service;
+they target notification presentation/snooze handling, not a garage action.
+The bundled SDK's selected v6 transport file contained one method whose
+signature accepts a VGDOS service body type and 21 v6 service-dispatch lines.
+The selected app tree had no direct reference to the wrapper class. These are
+static leads only: they do not establish a safe UI-free command entry point,
+and no internal action was invoked during the live validation.
 
 Any discovered primitive must be classified as read-only, user-visible, or
 mutating before runtime use. For a mutating primitive, retain the bridge's
@@ -107,6 +114,25 @@ MYQ_ENABLE_EXPERIMENTAL_CLOUD=1 is set. No checked-in service deploys it.
 A 2026 authorized session read the owner's door and one explicitly authorized
 open completed with sensor-verified closed-to-open state. This proves a useful
 fallback/oracle path, not a durable production architecture.
+
+## 2026-09-08 external software check
+
+The current public software evidence reinforces the cloud fallback boundary:
+
+- [`hjdhjd/myq`](https://github.com/hjdhjd/myq) remains an active modern v6
+  OAuth implementation used by its maintained Homebridge integration and
+  documents status plus open/close operations. It is a useful comparison/oracle
+  for current cloud behavior, not a local G0401 protocol implementation;
+- [`bvdcode/myq-home-assistant`](https://github.com/bvdcode/myq-home-assistant)
+  is a newer community Home Assistant integration that documents MFA/session
+  renewal and cloud polling, but likewise uses the residential cloud rather
+  than the opener's normal-LAN service; and
+- [`arraylabs/pymyq`](https://github.com/arraylabs/pymyq) is archived as of
+  2026-06-05, so it remains deprecated and was not revived.
+
+A narrow search found no current primary-source Ezlo SoftHub/Tricon myQ
+adapter that would improve the owner's software-only path. No external
+integration was installed or made part of the production bridge.
 
 ## Static and dynamic workflow
 

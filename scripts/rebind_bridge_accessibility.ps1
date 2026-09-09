@@ -9,7 +9,7 @@ $PackageName = "com.tahlor.myqbridge"
 $ServiceComponent = "com.tahlor.myqbridge/com.tahlor.myqbridge.BridgeAccessibilityService"
 
 if (-not $AdbSerial) {
-    $AdbSerial = (& "$PSScriptRoot\connect_superbox.ps1" | Select-Object -Last 1).Trim()
+    $AdbSerial = (& "$PSScriptRoot\connect_superbox.ps1" -AdbPath $AdbPath | Select-Object -Last 1).Trim()
 }
 if (-not $AdbSerial) { throw "Could not resolve Superbox ADB serial" }
 

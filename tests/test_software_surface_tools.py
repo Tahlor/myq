@@ -130,6 +130,9 @@ def test_g0401_path_extractors_strip_query_and_external_assets():
         "/jabout",
         "/jconfig_save",
     ]
+    assert extract_candidate_paths(
+        '<div class="panel">http://example.invalid/ignored</div> /jabout'
+    ) == ["/jabout"]
     assert extract_same_origin_assets(
         "http://192.0.2.1/", '<link href="/style.css"><script src="https://x/a.js">'
     ) == ["http://192.0.2.1/style.css"]

@@ -49,6 +49,15 @@ It records only status, content type, length, redirect/server metadata, and
 sanitized strings; it does not fuzz, submit forms, or call a route merely
 because a word such as save or connect appears in a script.
 
+The same bounded helper was rerun on 2026-09-08 against the known candidate
+from the prior sanitized conntrack correlation. It again returned 200 for `/`,
+`/jabout`, `/config.html`, `/config_hub.html`, and `/connect_hub.html`, and
+404 for `/start.html` and `/jscan_results`; `/jabout` was 1,225 bytes and the
+setup pages/assets matched the existing capture family. The run recorded
+`mutations_attempted=false`. Markup and absolute-URL fragments are filtered
+from the candidate-path report so the remaining names are route leads rather
+than HTML-tag noise.
+
 ## BLE boundary
 
 The exact installed official Android APK maps the model-specific CHUB
@@ -121,6 +130,16 @@ tools/myq_firmware_psm.py reproduces the historical unwrap in memory and emits
 only record metadata and hashes. The historical key, raw dump, and any
 current-device secret stay out of Git. The result is a lead for current-image
 analysis, not a derivation or credential guess for the G0401.
+
+## 2026-09-08 passive-prep result
+
+The secret-safe OTA/lineage catalog was run against the exact APK and the
+fresh/current LAN capture set. The APK produced only generic OTA/update/image/
+version markers plus NVM/identity and SWD lineage markers; it did not provide
+a firmware image or a current PSK value. The LAN assets produced provisioning
+and firmware-text markers only. No firmware/SPI/NVM dump is present in the
+available ignored artifacts, so the historical MCU parser was validated by
+its offline unit tests but no current-device parser claim was added.
 
 ## Current live limits and next software work
 

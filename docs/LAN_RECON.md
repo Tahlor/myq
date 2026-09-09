@@ -159,3 +159,22 @@ software-only gaps are:
 No reset, re-pair, firmware update, broad URI scan, RF action, or hardware
 probe is justified by this document. Keep the official-app bridge available
 for any future authorized state/action correlation.
+## 2026-09-09 app-side PSK and OTA narrowing
+
+The exact current APK gives two independent negative results that matter for a
+software-only cloud emulator. Classic local HTTP setup writes only Wi-Fi
+configuration. The CHUB BLE implementation likewise serializes only SSID,
+security type, a constant flag, and optional Wi-Fi password into its
+`config_save?<base64>\0` TLV; device-id/extra setter arguments are not sent.
+No OPEN/CLOSE operation exists in that hub BLE protocol class. Exact-APK
+searches also found no `myq_aes` or `connect.myqdevice.com` literal. This makes
+a factory-provisioned or device-derived 8883 PSK more likely than an app-sent
+long-lived credential, while not proving the derivation/storage mechanism.
+
+The SmartHub firmware setup screen does not retrieve firmware. It polls the
+normal device list's `mandatory_update_status`. A live, read-only inspection of
+the owner's G0401 showed no firmware/update keys in raw state and null
+`firmware_version` / `latest_available_firmware_version` with
+`firmware_available=false` in the typed state DTO. Current firmware acquisition
+therefore remains a passive OTA/device-network lane; no updater was invoked.
+

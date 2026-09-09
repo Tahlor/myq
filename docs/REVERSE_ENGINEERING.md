@@ -164,12 +164,35 @@ action. No background service should navigate the app.
 
 ## Provisioning and local protocol hypotheses
 
-The current CHUB BLE code is commissioning/metadata oriented. It does not prove
-an operational command path. The G0401 normal-LAN service and historical
-myq_aes/NVM work are documented in LAN_RECON.md. The current PSK lineage is
-still unknown: determine from static app/firmware evidence whether it is
-factory/random, server-provisioned, or derived. Stop when evidence indicates a
-device-unique secret with no software-accessible source; do not brute-force it.
+The exact 5.243.1.73243 CHUB implementation is now mapped in
+`com/chamberlain/bluetooth/peripherals/hub`. It uses GATT service
+`26d91a37-c279-4d0f-96a1-532ce41ce0f6` and a simple commissioning protocol.
+The only operation-like request strings in the hub peripheral are `about\0`,
+`scan_results\0`, and `config_save?<base64>\0`; no garage OPEN/CLOSE/toggle
+primitive appears in that class. The `config_save` Base64 body is a TLV made
+from SSID, Wi-Fi security type, a constant flag, and optional Wi-Fi password.
+Although the public setter accepts additional strings such as a device id,
+those values are not serialized into the BLE payload. The classic HTTP setup
+path independently sends only SSID/security/password/connect/end parameters.
+Together these paths provide strong evidence that the Android app does not
+provision the G0401's long-lived cloud PSK during normal Wi-Fi setup.
+
+The SmartHub firmware-update UI is also bounded.
+`setupHubFirmwareUpdateInteractor` refreshes the ordinary device list and
+returns only `mandatory_update_status`; the "updating firmware" ViewModel polls
+that status. It does not download a hub image, fetch a firmware location, or
+push an update payload. On the owner's live G0401, the typed device response
+reported `firmware_version=null`, `latest_available_firmware_version=null`, and
+`firmware_available=false`; its raw state JSON exposed no firmware/update keys.
+This shifts current-firmware acquisition toward passive device-side OTA/network
+observation rather than an app-side firmware API. Do not force an update.
+
+The G0401 normal-LAN service and historical myq_aes/NVM work are documented in
+LAN_RECON.md. The current PSK lineage is still unknown: determine from static
+app/firmware evidence whether it is factory/random, server-provisioned, or
+derived. Exact-APK searches found no `myq_aes` or `connect.myqdevice.com`
+literal. Stop when evidence indicates a device-unique secret with no
+software-accessible source; do not brute-force it.
 
 Historical MyQ clients and MQTT/WebSocket strings are leads only. Confirm
 current behavior from live evidence or exact APK/firmware evidence before

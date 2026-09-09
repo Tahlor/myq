@@ -18,24 +18,21 @@ from urllib.parse import quote, urlencode
 
 import httpx
 
-from .cloud import (
-    ANDROID_API_VERSION,
-    ANDROID_APPLICATION_ID,
-    ANDROID_BRAND_ID,
-    ANDROID_CULTURE,
-    AUTH_URL,
-    CloudSession,
-    MyQAuthError,
-    MyQCloudError,
-)
+from .cloud import CloudSession, MyQAuthError, MyQCloudError
+from .protocol_profile import ANDROID_2026_09
 
 
-ANDROID_CLIENT_ID = "ANDROID_CGI_MYQ"
-ANDROID_SCOPE = "MyQ_Residential offline_access"
-ANDROID_REDIRECT_URI = "com.myqops://android"
-ANDROID_AUTHORIZATION_URL = "https://partner-identity.myq-cloud.com/connect/authorize"
-ANDROID_APP_VERSION = "5.243.1.73243"
-ANDROID_USER_AGENT = "S7MAX/Android 12"
+ANDROID_CLIENT_ID = ANDROID_2026_09.client_id
+ANDROID_SCOPE = ANDROID_2026_09.scope or ""
+ANDROID_REDIRECT_URI = ANDROID_2026_09.redirect_uri or ""
+ANDROID_AUTHORIZATION_URL = ANDROID_2026_09.authorization_url
+ANDROID_APP_VERSION = ANDROID_2026_09.app_version
+ANDROID_USER_AGENT = ANDROID_2026_09.user_agent
+ANDROID_APPLICATION_ID = ANDROID_2026_09.application_id or ""
+ANDROID_CULTURE = ANDROID_2026_09.culture or ""
+ANDROID_BRAND_ID = ANDROID_2026_09.brand_id or ""
+ANDROID_API_VERSION = ANDROID_2026_09.api_version or ""
+AUTH_URL = ANDROID_2026_09.token_url
 
 
 @dataclass(frozen=True)

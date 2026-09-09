@@ -12,27 +12,23 @@ from typing import Any, Callable
 import httpx
 
 
-DEFAULT_CLIENT_ID = "IOS_CGI_MYQ"
-DEFAULT_APP_VERSION = "5.315.0.66076"
-DEFAULT_USER_AGENT = "myQ/315.0.66076 CFNetwork/3860.700.1 Darwin/25.6.0"
-ANDROID_CLIENT_ID = "ANDROID_CGI_MYQ"
-ANDROID_APPLICATION_ID = "226AC80CE0E4456384CC91DFF702D5C29909A176ADF14309A7DA3D18AFE5561D"
-ANDROID_CULTURE = "en"
-ANDROID_BRAND_ID = "1"
-ANDROID_API_VERSION = "4.1"
+from .protocol_profile import ANDROID_2026_09, DEFAULT_CLOUD_PROFILE, profile_for_client
 
-AUTH_URL = "https://partner-identity.myq-cloud.com/connect/token"
-ACCOUNTS_URL = "https://accounts.myq-cloud.com/api/v6.0/accounts"
-DEVICES_URL = "https://devices.myq-cloud.com/api/v6.2/Accounts/{account_id}/Devices"
-ANDROID_DEVICES_URL = "https://devices.myq-cloud.com/api/v6.0/Accounts/{account_id}/Devices"
-DOOR_ACTION_URL = (
-    "https://account-devices-gdo.myq-cloud.com/api/v6.0/Accounts/"
-    "{account_id}/door_openers/{door_opener_id}/{action}"
-)
-LOCKMODE_URL = (
-    "https://account-devices-gdo.myq-cloud.com/api/v6.0/accounts/"
-    "{account_id}/door_openers/{door_opener_id}/lockmode"
-)
+DEFAULT_CLIENT_ID = DEFAULT_CLOUD_PROFILE.client_id
+DEFAULT_APP_VERSION = DEFAULT_CLOUD_PROFILE.app_version
+DEFAULT_USER_AGENT = DEFAULT_CLOUD_PROFILE.user_agent
+ANDROID_CLIENT_ID = ANDROID_2026_09.client_id
+ANDROID_APPLICATION_ID = ANDROID_2026_09.application_id or ""
+ANDROID_CULTURE = ANDROID_2026_09.culture or ""
+ANDROID_BRAND_ID = ANDROID_2026_09.brand_id or ""
+ANDROID_API_VERSION = ANDROID_2026_09.api_version or ""
+
+AUTH_URL = DEFAULT_CLOUD_PROFILE.token_url
+ACCOUNTS_URL = DEFAULT_CLOUD_PROFILE.accounts_url
+DEVICES_URL = DEFAULT_CLOUD_PROFILE.device_urls[0]
+ANDROID_DEVICES_URL = ANDROID_2026_09.device_urls[0]
+DOOR_ACTION_URL = DEFAULT_CLOUD_PROFILE.door_action_url
+LOCKMODE_URL = DEFAULT_CLOUD_PROFILE.lockmode_url
 
 
 class MyQCloudError(RuntimeError):
@@ -170,16 +166,16 @@ class MyQCloudClient:
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
         }
+        profile = profile_for_client(self.session.client_id)
         if self.session.client_id == ANDROID_CLIENT_ID:
-            # These are the non-secret common headers emitted by the current
-            # official Android APK. Keep them scoped to Android sessions so
-            # the independently observed iOS client identity is unchanged.
+            # Public metadata is sourced from the versioned official-client
+            # profile. Credentials/session material remain separate.
             headers.update(
                 {
-                    "MyQApplicationId": ANDROID_APPLICATION_ID,
-                    "Culture": ANDROID_CULTURE,
-                    "BrandId": ANDROID_BRAND_ID,
-                    "ApiVersion": ANDROID_API_VERSION,
+                    "MyQApplicationId": profile.application_id or "",
+                    "Culture": profile.culture or "",
+                    "BrandId": profile.brand_id or "",
+                    "ApiVersion": profile.api_version or "",
                     "Accept": "application/json",
                 }
             )
@@ -247,12 +243,8 @@ class MyQCloudClient:
         # on devices.myq-cloud.com. The newer direct-client evidence uses the
         # v6.2 route. Prefer the APK-shaped route for Android sessions, then
         # fall back to v6.2 only when the service says that route is absent.
-        urls = [
-            ANDROID_DEVICES_URL.format(account_id=account_id),
-            DEVICES_URL.format(account_id=account_id),
-        ] if self.session.client_id == ANDROID_CLIENT_ID else [
-            DEVICES_URL.format(account_id=account_id)
-        ]
+        profile = profile_for_client(self.session.client_id)
+        urls = [url.format(account_id=account_id) for url in profile.device_urls]
         response: httpx.Response | None = None
         for url in urls:
             response = self.request("GET", url)

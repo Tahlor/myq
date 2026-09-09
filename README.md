@@ -68,6 +68,8 @@ The exact order and evidence template are in
 [docs/LIVE_RUNBOOK.md](docs/LIVE_RUNBOOK.md). Completion and the hardware gate
 are in [docs/COMPLETION_CRITERIA.md](docs/COMPLETION_CRITERIA.md).
 
+The long-lived architecture rules are in [docs/GOALS_AND_PROVIDER_HIERARCHY.md](docs/GOALS_AND_PROVIDER_HIERARCHY.md), and the exact recovery procedure for future APK/API changes is in [docs/FUTURE_CHANGE_RECOVERY.md](docs/FUTURE_CHANGE_RECOVERY.md).
+
 ## Current evidence that must not be lost
 
 The current target is `MYQ-G0401`, firmware `1.10`. Read-only evidence shows

@@ -70,3 +70,70 @@ def test_profile_audit_does_not_require_runtime_only_application_id(tmp_path: Pa
     result = audit([tmp_path])
     assert result["drift_detected"] is False
     assert "application_id" in result["unattested_runtime_markers"]
+
+
+def test_session_round_trip_pins_exact_profile():
+    from myq_bridge.cloud import CloudSession
+
+    session = CloudSession(
+        "access", "refresh",
+        client_id=ANDROID_2026_09.client_id,
+        app_version=ANDROID_2026_09.app_version,
+        user_agent=ANDROID_2026_09.user_agent,
+        profile_name=ANDROID_2026_09.name,
+    )
+    raw = session.to_dict()
+    assert raw["profile_name"] == ANDROID_2026_09.name
+    restored = CloudSession.from_dict(raw)
+    assert restored.profile is ANDROID_2026_09
+    assert restored.profile_name == ANDROID_2026_09.name
+
+
+def test_legacy_session_migrates_to_unique_profile():
+    from myq_bridge.cloud import CloudSession
+
+    restored = CloudSession.from_dict({
+        "access_token": "access", "refresh_token": "refresh",
+        "client_id": ANDROID_2026_09.client_id,
+        "app_version": ANDROID_2026_09.app_version,
+    })
+    assert restored.profile_name == ANDROID_2026_09.name
+
+
+def test_unknown_or_mismatched_profile_fails_closed():
+    import pytest
+    from myq_bridge.cloud import CloudSession
+
+    unknown = CloudSession("a", "r", profile_name="missing-profile")
+    with pytest.raises(ValueError, match="Unknown MyQ protocol profile"):
+        _ = unknown.profile
+
+    mismatched = CloudSession(
+        "a", "r",
+        client_id="IOS_CGI_MYQ",
+        profile_name=ANDROID_2026_09.name,
+    )
+    with pytest.raises(ValueError, match="expects client_id"):
+        _ = mismatched.profile
+
+
+def test_cloud_health_surfaces_pinned_profile(monkeypatch):
+    from fastapi.testclient import TestClient
+    from myq_bridge import cloud_cli
+    from myq_bridge.cloud import CloudSession
+
+    class FakeClient:
+        session = CloudSession(
+            "access", "refresh",
+            client_id=ANDROID_2026_09.client_id,
+            app_version=ANDROID_2026_09.app_version,
+            profile_name=ANDROID_2026_09.name,
+        )
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(cloud_cli, "_client", lambda: FakeClient())
+    with TestClient(cloud_cli.create_app("local-api-key-1234")) as web:
+        payload = web.get("/health").json()
+    assert payload["protocol_profile"] == ANDROID_2026_09.name

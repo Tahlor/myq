@@ -27,7 +27,7 @@ A change in one layer must not automatically invalidate the others.
 
 ## Versioned protocol profile
 
-Public protocol metadata belongs in one versioned structure: client identity, OAuth authorization/token endpoints, scope, redirect URI, application/brand/culture/API headers, account/device read routes, and explicit operation routes. Session credentials are stored separately and rotate independently.
+Public protocol metadata belongs in one versioned structure: client identity, OAuth authorization/token endpoints, scope, redirect URI, application/brand/culture/API headers, account/device read routes, and explicit operation routes. Session credentials are stored separately and rotate independently. Every persisted cloud session pins an exact `profile_name`; client ID alone is not a durable version key because MyQ may reuse it across app generations.
 
 An app update is not itself a reason to change the Pi3-native client. Continue using the last-known-good profile until read-only evidence shows it no longer works or the exact new APK demonstrates a required change. If a new read route is needed, bounded read-only fallback is acceptable. Never add automatic fallback between mutating endpoints.
 
@@ -35,6 +35,7 @@ An app update is not itself a reason to change the Pi3-native client. Continue u
 
 - repository policy still forbids `pymyq` as a runtime dependency;
 - last-known-good protocol profile remains available;
+- persisted sessions pin an exact profile name, with legacy migration only when client ID/app version resolve uniquely;
 - exact APK audit reports known/missing/drifted public surfaces without printing secrets;
 - read-only account and device tests pass;
 - state normalization handles only stable OPEN/CLOSED as actionable;

@@ -87,7 +87,50 @@ LAST_KNOWN_GOOD_ANDROID = ANDROID_2026_09
 DEFAULT_CLOUD_PROFILE = IOS_2026_09
 
 
+def profile_by_name(name: str) -> MyQProtocolProfile:
+    try:
+        return PROFILES[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown MyQ protocol profile: {name!r}") from exc
+
+
+def profile_for_session(
+    client_id: str,
+    *,
+    profile_name: str | None = None,
+    app_version: str | None = None,
+) -> MyQProtocolProfile:
+    """Resolve an exact immutable profile without silently guessing.
+
+    Explicit profile names win. Legacy sessions that predate profile pinning
+    can be migrated by unique client-id/app-version evidence. If future MyQ
+    releases reuse a client ID and the session is ambiguous, fail closed and
+    require the profile name to be recorded instead of selecting "latest".
+    """
+    if profile_name:
+        profile = profile_by_name(profile_name)
+        if profile.client_id != client_id:
+            raise ValueError(
+                f"Protocol profile {profile_name!r} expects client_id "
+                f"{profile.client_id!r}, not {client_id!r}"
+            )
+        return profile
+
+    candidates = [profile for profile in PROFILES.values() if profile.client_id == client_id]
+    if app_version:
+        exact = [profile for profile in candidates if profile.app_version == app_version]
+        if len(exact) == 1:
+            return exact[0]
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        raise ValueError(f"No MyQ protocol profile matches client_id {client_id!r}")
+    raise ValueError(
+        f"Multiple MyQ protocol profiles match client_id {client_id!r}; "
+        "persist an explicit profile_name"
+    )
+
+
 def profile_for_client(client_id: str) -> MyQProtocolProfile:
-    if client_id == ANDROID_2026_09.client_id:
-        return ANDROID_2026_09
-    return IOS_2026_09
+    """Backward-compatible helper for callers that have only a client ID."""
+    return profile_for_session(client_id)

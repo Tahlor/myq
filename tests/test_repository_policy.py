@@ -44,11 +44,15 @@ def test_hardware_activation_requires_both_explicit_values():
     assert "HARDWARE_NOW_JUSTIFIED=yes" in runbook
 
 
-def test_direct_cloud_is_opt_in_and_has_no_deployment_bootstrap():
+def test_pi3_native_cloud_deploy_is_opt_in_and_secret_safe():
     cloud_cli = _read("src/myq_bridge/cloud_cli.py")
+    service = _read("deploy/myq-cloud.service")
+    installer = _read("scripts/install_pi3_native_cloud.sh")
     assert 'EXPERIMENTAL_CLOUD_FLAG = "MYQ_ENABLE_EXPERIMENTAL_CLOUD"' in cloud_cli
-    assert not (ROOT / "deploy" / "myq-cloud.service").exists()
-    assert not (ROOT / "deploy" / "myq_bridge.env.example").exists()
+    assert "127.0.0.1" in service and "0.0.0.0" not in service
+    assert "/var/lib/myq/cloud_session.json" in installer
+    assert "access_token" not in installer.lower()
+    assert "refresh_token" not in installer.lower()
     assert not (ROOT / "scripts" / "provision_pi3_session.ps1").exists()
 
 

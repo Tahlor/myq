@@ -108,7 +108,11 @@ def create_app(api_key: str) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "backend": "direct-cloud"}
+        return {
+            "status": "ok",
+            "backend": "direct-cloud",
+            "protocol_profile": client.session.profile.name,
+        }
 
     def translate(call):
         try:

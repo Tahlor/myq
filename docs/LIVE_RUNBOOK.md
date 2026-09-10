@@ -139,10 +139,7 @@ python tools/ota_surface_catalog.py captures/firmware --out captures/ota/catalog
 
 ### 6. Bounded current-2026 cloud and partner fallback
 
-The clean-room `myq-cloud` client may be used for read-only MFA/refresh/session
-experiments and correlation evidence only. It requires
-`MYQ_ENABLE_EXPERIMENTAL_CLOUD=1`, has no checked-in service deployment, and
-must not be placed behind the normal Broadlink path. Do not retry an ambiguous
+The clean-room `myq-cloud` client may be used for read-only MFA/refresh/session experiments and controlled validation. It requires `MYQ_ENABLE_EXPERIMENTAL_CLOUD=1`. A localhost-only Pi3 candidate service is packaged, but it must not be placed ahead of the proven official-app provider until the promotion gate in `PI3_NATIVE_CLOUD.md` passes. Do not retry an ambiguous
 mutation. A current session refresh or guarded one-off is evidence, not a
 production promotion.
 

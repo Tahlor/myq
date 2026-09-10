@@ -68,6 +68,8 @@ The exact order and evidence template are in
 [docs/LIVE_RUNBOOK.md](docs/LIVE_RUNBOOK.md). Completion and the hardware gate
 are in [docs/COMPLETION_CRITERIA.md](docs/COMPLETION_CRITERIA.md).
 
+For long-lived recovery and deployment, see [Future-change recovery](docs/FUTURE_CHANGE_RECOVERY.md), [Goals/provider hierarchy](docs/GOALS_AND_PROVIDER_HIERARCHY.md), and [Pi3 Linux-native cloud client](docs/PI3_NATIVE_CLOUD.md).
+
 The long-lived architecture rules are in [docs/GOALS_AND_PROVIDER_HIERARCHY.md](docs/GOALS_AND_PROVIDER_HIERARCHY.md), and the exact recovery procedure for future APK/API changes is in [docs/FUTURE_CHANGE_RECOVERY.md](docs/FUTURE_CHANGE_RECOVERY.md).
 
 ## Current evidence that must not be lost
@@ -111,8 +113,7 @@ normalized state and time; it is advisory and must never authorize a command.
 
 `src/myq_bridge/` is the UIAutomator diagnostic/second driver. `tools/`
 contains read-only LAN/TLS observation helpers and offline historical parsers.
-`myq-cloud` is deliberately bounded experimental oracle tooling and requires
-`MYQ_ENABLE_EXPERIMENTAL_CLOUD=1`; no checked-in service deploys it.
+`myq-cloud` remains explicitly gated by `MYQ_ENABLE_EXPERIMENTAL_CLOUD=1`. A localhost-only Pi3 candidate service is now packaged in `deploy/`; installation does not promote it ahead of the proven official-app path.
 
 Keep credentials, OAuth/session tokens, APKs, firmware/NVM, pcaps, screenshots,
 UI dumps, and live identifiers in ignored local paths. Never use a command,

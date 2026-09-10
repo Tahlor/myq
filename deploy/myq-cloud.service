@@ -1,0 +1,21 @@
+[Unit]
+Description=myQ Linux-native cloud bridge (candidate)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/Projects/myq
+EnvironmentFile=/etc/myq/myq-cloud.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/Projects/myq/.venv/bin/python -m myq_bridge.cloud_cli serve --host 127.0.0.1 --port 8766
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -141,4 +141,5 @@ def exchange_authorization_code(
         client_id=client_id,
         app_version=app_version,
         user_agent=user_agent,
+        profile_name=ANDROID_2026_09.name,
     )

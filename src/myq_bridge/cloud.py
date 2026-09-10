@@ -12,7 +12,12 @@ from typing import Any, Callable
 import httpx
 
 
-from .protocol_profile import ANDROID_2026_09, DEFAULT_CLOUD_PROFILE, profile_for_client
+from .protocol_profile import (
+    ANDROID_2026_09,
+    DEFAULT_CLOUD_PROFILE,
+    profile_by_name,
+    profile_for_session,
+)
 
 DEFAULT_CLIENT_ID = DEFAULT_CLOUD_PROFILE.client_id
 DEFAULT_APP_VERSION = DEFAULT_CLOUD_PROFILE.app_version
@@ -46,6 +51,15 @@ class CloudSession:
     client_id: str = DEFAULT_CLIENT_ID
     app_version: str = DEFAULT_APP_VERSION
     user_agent: str = DEFAULT_USER_AGENT
+    profile_name: str | None = None
+
+    @property
+    def profile(self):
+        return profile_for_session(
+            self.client_id,
+            profile_name=self.profile_name,
+            app_version=self.app_version,
+        )
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "CloudSession":
@@ -53,12 +67,19 @@ class CloudSession:
         refresh = str(raw.get("refresh_token") or "").strip()
         if not access or not refresh:
             raise ValueError("Cloud session requires access_token/jwt and refresh_token")
+        client_id = str(raw.get("client_id") or DEFAULT_CLIENT_ID)
+        app_version = str(raw.get("app_version") or DEFAULT_APP_VERSION)
+        profile_name = str(raw.get("profile_name") or "").strip() or None
+        profile = profile_for_session(
+            client_id, profile_name=profile_name, app_version=app_version
+        )
         return cls(
             access_token=access,
             refresh_token=refresh,
-            client_id=str(raw.get("client_id") or DEFAULT_CLIENT_ID),
-            app_version=str(raw.get("app_version") or DEFAULT_APP_VERSION),
-            user_agent=str(raw.get("user_agent") or DEFAULT_USER_AGENT),
+            client_id=client_id,
+            app_version=app_version,
+            user_agent=str(raw.get("user_agent") or profile.user_agent),
+            profile_name=profile.name,
         )
 
     def to_dict(self) -> dict[str, str]:
@@ -68,6 +89,7 @@ class CloudSession:
             "client_id": self.client_id,
             "app_version": self.app_version,
             "user_agent": self.user_agent,
+            "profile_name": self.profile.name,
         }
 
 
@@ -118,12 +140,20 @@ def load_cloud_session(store: SessionStore | None = None) -> CloudSession:
             "No MyQ cloud session found. Set MYQ_ACCESS_TOKEN/MYQ_JWT and "
             "MYQ_REFRESH_TOKEN, or provide config/cloud_session.json."
         )
+    requested_profile = os.environ.get("MYQ_PROTOCOL_PROFILE", DEFAULT_CLOUD_PROFILE.name)
+    profile = profile_by_name(requested_profile)
+    client_id = os.environ.get("MYQ_CLIENT_ID", profile.client_id)
+    app_version = os.environ.get("MYQ_APP_VERSION", profile.app_version)
+    resolved = profile_for_session(
+        client_id, profile_name=profile.name, app_version=app_version
+    )
     return CloudSession(
         access_token=access,
         refresh_token=refresh,
-        client_id=os.environ.get("MYQ_CLIENT_ID", DEFAULT_CLIENT_ID),
-        app_version=os.environ.get("MYQ_APP_VERSION", DEFAULT_APP_VERSION),
-        user_agent=os.environ.get("MYQ_USER_AGENT", DEFAULT_USER_AGENT),
+        client_id=client_id,
+        app_version=app_version,
+        user_agent=os.environ.get("MYQ_USER_AGENT", resolved.user_agent),
+        profile_name=resolved.name,
     )
 
 
@@ -143,6 +173,9 @@ class MyQCloudClient:
         on_session_updated: Callable[[CloudSession], None] | None = None,
         timeout: float = 20.0,
     ):
+        resolved_profile = session.profile
+        if session.profile_name != resolved_profile.name:
+            session = replace(session, profile_name=resolved_profile.name)
         self.session = session
         self.on_session_updated = on_session_updated
         self._client = httpx.Client(transport=transport, timeout=timeout, follow_redirects=True)
@@ -166,8 +199,8 @@ class MyQCloudClient:
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
         }
-        profile = profile_for_client(self.session.client_id)
-        if self.session.client_id == ANDROID_CLIENT_ID:
+        profile = self.session.profile
+        if profile.application_id:
             # Public metadata is sourced from the versioned official-client
             # profile. Credentials/session material remain separate.
             headers.update(
@@ -183,7 +216,7 @@ class MyQCloudClient:
 
     def refresh(self) -> CloudSession:
         response = self._client.post(
-            AUTH_URL,
+            self.session.profile.token_url,
             headers={
                 **self.headers,
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -234,7 +267,7 @@ class MyQCloudClient:
         return response
 
     def accounts(self) -> list[dict[str, Any]]:
-        response = self.request("GET", ACCOUNTS_URL)
+        response = self.request("GET", self.session.profile.accounts_url)
         self._raise(response, "fetch accounts")
         return self._collection(response.json(), "accounts", "fetch accounts")
 
@@ -243,7 +276,7 @@ class MyQCloudClient:
         # on devices.myq-cloud.com. The newer direct-client evidence uses the
         # v6.2 route. Prefer the APK-shaped route for Android sessions, then
         # fall back to v6.2 only when the service says that route is absent.
-        profile = profile_for_client(self.session.client_id)
+        profile = self.session.profile
         urls = [url.format(account_id=account_id) for url in profile.device_urls]
         response: httpx.Response | None = None
         for url in urls:
@@ -303,7 +336,7 @@ class MyQCloudClient:
             raise ValueError("action must be 'open' or 'close'")
         response = self.request(
             "PUT",
-            DOOR_ACTION_URL.format(
+            self.session.profile.door_action_url.format(
                 account_id=account_id,
                 door_opener_id=door_opener_id,
                 action=action,
@@ -463,7 +496,7 @@ class MyQCloudClient:
     ) -> None:
         response = self.request(
             "PUT",
-            LOCKMODE_URL.format(
+            self.session.profile.lockmode_url.format(
                 account_id=account_id,
                 door_opener_id=door_opener_id,
             ),

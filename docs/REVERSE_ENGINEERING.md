@@ -120,7 +120,7 @@ src/myq_bridge/cloud.py implements the currently observed session shape:
 
 src/myq_bridge/cloud_cli.py exposes read-only status/preflight and explicit
 action-confirmed commands for research. The CLI is blocked unless
-MYQ_ENABLE_EXPERIMENTAL_CLOUD=1 is set. No checked-in service deploys it.
+MYQ_ENABLE_EXPERIMENTAL_CLOUD=1 is set. A localhost-only Pi3 candidate service is packaged, but remains unpromoted until the read/action/restart promotion gate passes.
 
 A 2026 authorized session read the owner's door and one explicitly authorized
 open completed with sensor-verified closed-to-open state. This proves a useful

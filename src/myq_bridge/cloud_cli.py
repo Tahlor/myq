@@ -93,6 +93,7 @@ def create_app(api_key: str) -> FastAPI:
 
     app = FastAPI(title="myQ direct cloud bridge", version="0.2.0")
     client = _client()
+    selected_identity: tuple[str, str] | None = None
 
     def auth(x_api_key: str | None = Header(default=None)) -> None:
         import secrets
@@ -122,16 +123,38 @@ def create_app(api_key: str) -> FastAPI:
         except MyQCloudError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    def remember_identity(door: dict[str, Any]) -> dict[str, Any]:
+        nonlocal selected_identity
+        account_id = str(door.get("account_id") or "")
+        opener_id = str(door.get("door_opener_id") or "")
+        if account_id and opener_id:
+            selected_identity = (account_id, opener_id)
+        return door
+
     def configured_door() -> dict[str, Any]:
+        nonlocal selected_identity
+        if selected_identity is not None:
+            account_id, opener_id = selected_identity
+            doors = translate(lambda: client.door_status(account_id))
+            try:
+                return remember_identity(select_door(doors, door_id=opener_id))
+            except ValueError:
+                selected_identity = None
         doors = translate(client.door_status)
         try:
-            return select_door(
+            return remember_identity(select_door(
                 doors,
                 door_id=os.environ.get("MYQ_DOOR_ID"),
                 door_name=os.environ.get("MYQ_DOOR_NAME"),
-            )
+            ))
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    def configured_target() -> tuple[str, str]:
+        if selected_identity is None:
+            configured_door()
+        assert selected_identity is not None
+        return selected_identity
 
     @app.get("/status", dependencies=[protected])
     def status() -> dict[str, Any]:
@@ -157,26 +180,9 @@ def create_app(api_key: str) -> FastAPI:
         }
 
     def garage_action(action: str) -> dict[str, Any]:
-        door = configured_door()
-        state = str(door.get("door_state") or "").strip().lower()
         desired = "open" if action == "open" else "closed"
-        if state not in {"open", "closed"}:
-            raise HTTPException(
-                status_code=503,
-                detail="Configured garage door state is not stable",
-            )
-        if door.get("online") is not True:
-            raise HTTPException(
-                status_code=503,
-                detail="Configured garage door is not confirmed online",
-            )
-        account_id = str(door.get("account_id") or "")
-        opener_id = str(door.get("door_opener_id") or "")
-        if not account_id or not opener_id:
-            raise HTTPException(status_code=503, detail="Garage door identifiers are unavailable")
-        result = translate(
-            lambda: client.door_command(account_id, opener_id, action)
-        )
+        account_id, opener_id = configured_target()
+        result = translate(lambda: client.door_command(account_id, opener_id, action))
         return {**result, "backend": "direct-cloud", "desired_state": desired}
 
     @app.post("/garage/open", dependencies=[protected])

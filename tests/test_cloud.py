@@ -210,6 +210,7 @@ def test_door_command_verifies_observed_state_before_and_after_action():
 
     assert result == {
         "ok": True,
+        "verified": True,
         "changed": True,
         "action": "open",
         "account_id": "acct",
@@ -218,7 +219,6 @@ def test_door_command_verifies_observed_state_before_and_after_action():
         "after": "open",
     }
     assert seen == [
-        ("GET", ACCOUNTS_URL),
         ("GET", DEVICES_URL.format(account_id="acct")),
         (
             "PUT",
@@ -226,7 +226,6 @@ def test_door_command_verifies_observed_state_before_and_after_action():
                 account_id="acct", door_opener_id="door-1", action="open"
             ),
         ),
-        ("GET", ACCOUNTS_URL),
         ("GET", DEVICES_URL.format(account_id="acct")),
     ]
 
@@ -273,7 +272,7 @@ def test_door_preflight_is_read_only_and_reports_action_plan():
         "online": True,
         "reason": None,
     }
-    assert seen == ["GET", "GET"]
+    assert seen == ["GET"]
 
 
 def test_door_command_noops_when_requested_state_is_already_observed():
@@ -347,7 +346,7 @@ def test_door_command_refuses_unknown_or_transitional_state_before_mutation():
     finally:
         client.close()
 
-    assert seen == ["GET", "GET"]
+    assert seen == ["GET"]
 
 
 def test_door_command_refuses_unconfirmed_online_state_before_mutation():
@@ -382,7 +381,7 @@ def test_door_command_refuses_unconfirmed_online_state_before_mutation():
     finally:
         client.close()
 
-    assert seen == ["GET", "GET"]
+    assert seen == ["GET"]
 
 
 def test_door_command_fails_closed_when_post_state_is_not_verified():
@@ -424,7 +423,6 @@ def test_door_command_fails_closed_when_post_state_is_not_verified():
         client.close()
 
     assert seen == [
-        ("GET", ACCOUNTS_URL),
         ("GET", DEVICES_URL.format(account_id="acct")),
         (
             "PUT",
@@ -733,3 +731,27 @@ def test_cloud_preflight_endpoint_is_read_only(monkeypatch):
     assert response.status_code == 200
     assert response.json()["ready"] is True
     assert calls == [("acct-1", "door-1", "open")]
+
+
+def test_garage_status_reuses_selected_identity_without_relisting_accounts(monkeypatch):
+    calls: list[str | None] = []
+
+    class FakeClient:
+        def close(self):
+            pass
+
+        def door_status(self, account_id=None):
+            calls.append(account_id)
+            return [{
+                "account_id": "acct-1", "door_opener_id": "door-1",
+                "name": "Main Garage", "door_state": "closed", "online": True,
+            }]
+
+    monkeypatch.setattr(cloud_cli, "_client", lambda: FakeClient())
+    app = cloud_cli.create_app("local-api-key-1234")
+    headers = {"X-API-Key": "local-api-key-1234"}
+    with TestClient(app) as web:
+        assert web.get("/garage/status", headers=headers).status_code == 200
+        assert web.get("/garage/status", headers=headers).status_code == 200
+
+    assert calls == [None, "acct-1"]

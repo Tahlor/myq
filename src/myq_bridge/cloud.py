@@ -290,12 +290,15 @@ class MyQCloudClient:
     def door_status(self, account_id: str | None = None) -> list[dict[str, Any]]:
         """Return a compact automation-friendly summary of every garage door."""
         doors: list[dict[str, Any]] = []
-        for account in self.accounts():
-            current_account_id = str(account.get("id") or "")
-            if not current_account_id:
-                continue
-            if account_id is not None and current_account_id != str(account_id):
-                continue
+        if account_id is not None:
+            account_ids = [str(account_id)]
+        else:
+            account_ids = [
+                str(account.get("id") or "")
+                for account in self.accounts()
+                if account.get("id")
+            ]
+        for current_account_id in account_ids:
             for device in self.devices(current_account_id):
                 state = device.get("state") or {}
                 if not isinstance(state, dict):
@@ -354,7 +357,7 @@ class MyQCloudClient:
         action: str,
         *,
         verify_timeout: float = 12.0,
-        poll_interval: float = 0.75,
+        poll_interval: float = 2.0,
     ) -> dict[str, Any]:
         """Serialize and safely perform one explicit door action."""
         with self._command_lock:
@@ -406,7 +409,7 @@ class MyQCloudClient:
         action: str,
         *,
         verify_timeout: float = 12.0,
-        poll_interval: float = 0.75,
+        poll_interval: float = 2.0,
     ) -> dict[str, Any]:
         """Safely perform one explicit door action and verify the resulting state.
 
@@ -483,6 +486,7 @@ class MyQCloudClient:
     ) -> dict[str, Any]:
         return {
             "ok": True,
+            "verified": True,
             "changed": changed,
             "action": action,
             "account_id": account_id,

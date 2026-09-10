@@ -28,3 +28,13 @@ def test_pi3_installer_never_embeds_or_generates_myq_credentials():
     assert "access_token" not in lowered
     assert "refresh_token" not in lowered
     assert "pymyq" not in lowered
+
+
+def test_pi3_base_install_does_not_pull_android_automation_dependencies():
+    import tomllib
+
+    project = tomllib.loads(_read("pyproject.toml"))["project"]
+    base = "\n".join(project["dependencies"]).lower()
+    android = "\n".join(project["optional-dependencies"]["android"]).lower()
+    assert "uiautomator2" not in base
+    assert "uiautomator2" in android

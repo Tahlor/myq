@@ -10,7 +10,7 @@ Runtime path:
 Broadlink -> localhost Pi3 myq-cloud -> Chamberlain cloud -> G0401
 ```
 
-The client implements only PKCE/OAuth session refresh, account/device discovery, normalized garage state, explicit open/close, and post-state verification. Public protocol metadata is pinned to an immutable profile in `protocol_profile.py`; rotating credentials remain in `/var/lib/myq/cloud_session.json` and never belong in Git.
+The client implements only PKCE/OAuth session refresh, account/device discovery, normalized garage state, explicit open/close, and post-state verification. Public protocol metadata is pinned to an immutable profile in `protocol_profile.py`; rotating credentials remain in `/var/lib/myq/cloud_session.json` and never belong in Git. The base Python install intentionally excludes Android automation dependencies; `uiautomator2` is available only through the optional `android` extra for Superbox/UI tooling.
 
 The current candidate profile is `android-5.243.1.73243`. A persisted session records its exact `profile_name`. Legacy sessions are migrated only when client ID/app version resolve unambiguously. Future ambiguity fails closed rather than selecting the newest profile.
 

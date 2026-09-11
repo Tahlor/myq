@@ -57,6 +57,32 @@ def test_refresh_rotates_and_persists_session(tmp_path: Path):
     assert len(requests) == 1
 
 
+def test_android_refresh_matches_oauth_interceptor_headers():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert "authorization" not in request.headers
+        assert request.headers["app-version"] == "5.243.1.73243"
+        assert request.headers["user-agent"] == "S7MAX/Android 12"
+        assert request.headers["myqapplicationid"]
+        assert request.headers["brandid"] == "1"
+        assert "culture" not in request.headers
+        assert "apiversion" not in request.headers
+        assert request.headers["content-type"].startswith("application/x-www-form-urlencoded")
+        return httpx.Response(200, json={"access_token": "new-access"})
+
+    client = MyQCloudClient(
+        CloudSession(
+            "old-access", "old-refresh", client_id=ANDROID_CLIENT_ID,
+            app_version="5.243.1.73243", user_agent="S7MAX/Android 12",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        client.refresh()
+    finally:
+        client.close()
+
+
 def test_refresh_keeps_existing_refresh_token_when_not_rotated():
     def handler(request: httpx.Request) -> httpx.Response:
         assert str(request.url) == AUTH_URL
@@ -439,9 +465,9 @@ def test_android_session_prefers_the_apk_device_route_and_headers():
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append((request.method, str(request.url)))
         assert request.headers["myqapplicationid"]
-        assert request.headers["culture"] == "en"
+        assert "culture" not in request.headers
         assert request.headers["brandid"] == "1"
-        assert request.headers["apiversion"] == "4.1"
+        assert "apiversion" not in request.headers
         return httpx.Response(200, json={"items": [{"device_family": "garagedoor"}]})
 
     client = MyQCloudClient(
@@ -456,6 +482,36 @@ def test_android_session_prefers_the_apk_device_route_and_headers():
     assert seen == [
         ("GET", ANDROID_DEVICES_URL.format(account_id="acct")),
     ]
+
+
+def test_android_door_action_matches_current_apk_request_shape():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "PUT"
+        assert str(request.url) == DOOR_ACTION_URL.format(
+            account_id="acct", door_opener_id="door", action="open"
+        )
+        assert request.content == b""
+        assert request.headers["authorization"] == "Bearer access"
+        assert request.headers["app-version"] == "5.243.1.73243"
+        assert request.headers["user-agent"] == "S7MAX/Android 12"
+        assert request.headers["myqapplicationid"]
+        assert request.headers["brandid"] == "1"
+        assert "culture" not in request.headers
+        assert "apiversion" not in request.headers
+        assert "content-type" not in request.headers
+        return httpx.Response(202)
+
+    client = MyQCloudClient(
+        CloudSession(
+            "access", "refresh", client_id=ANDROID_CLIENT_ID,
+            app_version="5.243.1.73243", user_agent="S7MAX/Android 12",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        client.door_action("acct", "door", "open")
+    finally:
+        client.close()
 
 
 def test_android_device_route_falls_back_to_direct_v6_2_route():

@@ -191,34 +191,31 @@ class MyQCloudClient:
         self.close()
 
     @property
-    def headers(self) -> dict[str, str]:
+    def app_headers(self) -> dict[str, str]:
+        """Application headers emitted by the official-client interceptor."""
         headers = {
-            "Authorization": f"Bearer {self.session.access_token}",
             "App-Version": self.session.app_version,
             "User-Agent": self.session.user_agent,
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9",
         }
         profile = self.session.profile
         if profile.application_id:
-            # Public metadata is sourced from the versioned official-client
-            # profile. Credentials/session material remain separate.
-            headers.update(
-                {
-                    "MyQApplicationId": profile.application_id or "",
-                    "Culture": profile.culture or "",
-                    "BrandId": profile.brand_id or "",
-                    "ApiVersion": profile.api_version or "",
-                    "Accept": "application/json",
-                }
-            )
+            headers["MyQApplicationId"] = profile.application_id
+        if profile.brand_id:
+            headers["BrandId"] = profile.brand_id
         return headers
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self.session.access_token}",
+            **self.app_headers,
+        }
 
     def refresh(self) -> CloudSession:
         response = self._client.post(
             self.session.profile.token_url,
             headers={
-                **self.headers,
+                **self.app_headers,
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             data={

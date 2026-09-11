@@ -107,9 +107,7 @@ def exchange_authorization_code(
         "App-Version": app_version,
         "User-Agent": user_agent,
         "MyQApplicationId": ANDROID_APPLICATION_ID,
-        "Culture": ANDROID_CULTURE,
         "BrandId": ANDROID_BRAND_ID,
-        "ApiVersion": ANDROID_API_VERSION,
     }
     if app_check_token:
         headers["Firebase-AppCheck-Token"] = app_check_token

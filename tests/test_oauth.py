@@ -54,9 +54,9 @@ def test_authorization_code_exchange_returns_android_session():
         assert request.headers["app-version"] == "5.243.1.73243"
         assert request.headers["user-agent"] == "S7MAX/Android 12"
         assert request.headers["myqapplicationid"]
-        assert request.headers["culture"] == "en"
+        assert "culture" not in request.headers
         assert request.headers["brandid"] == "1"
-        assert request.headers["apiversion"] == "4.1"
+        assert "apiversion" not in request.headers
         form = parse_qs(request.content.decode("utf-8"))
         assert form["client_id"] == [ANDROID_CLIENT_ID]
         assert form["scope"] == [ANDROID_SCOPE]

@@ -73,6 +73,17 @@ if command -v tcpdump >/dev/null 2>&1; then
   fi
 else
   echo "# tcpdump-unavailable"
+  echo "## conntrack-watch"
+  i=0
+  while [ "$i" -lt "$duration" ]; do
+    if [ -r /proc/net/nf_conntrack ]; then
+      grep -F "src=$candidate_ip " /proc/net/nf_conntrack 2>/dev/null || true
+    elif command -v conntrack >/dev/null 2>&1; then
+      conntrack -L 2>/dev/null | grep -F "src=$candidate_ip " || true
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
 fi
 REMOTE
 

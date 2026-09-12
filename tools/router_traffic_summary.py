@@ -31,7 +31,32 @@ def _protocol(line: str) -> str:
     return "unknown"
 
 
+
+def _detect_candidate(text: str) -> str:
+    sources: set[str] = set()
+    for line in text.splitlines():
+        tcpdump = TCPDUMP_IP_RE.search(line)
+        if tcpdump:
+            src, _sport, _dst, dport = tcpdump.groups()
+            if dport == "8883":
+                sources.add(src)
+            continue
+        fields = PAIR_RE.findall(line)
+        first: dict[str, str] = {}
+        for key, value in fields:
+            if key not in first:
+                first[key] = value
+            if {"src", "dst", "sport", "dport"} <= first.keys():
+                break
+        if first.get("dport") == "8883" and first.get("src"):
+            sources.add(first["src"])
+    if len(sources) != 1:
+        raise ValueError(f"expected exactly one outbound-8883 source, found {len(sources)}")
+    return next(iter(sources))
+
 def summarize(text: str, candidate_ip: str) -> dict[str, Any]:
+    if candidate_ip == "auto":
+        candidate_ip = _detect_candidate(text)
     endpoints: Counter[tuple[str, str, str]] = Counter()
     hostnames: set[str] = set()
     for line in text.splitlines():

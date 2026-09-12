@@ -61,3 +61,27 @@ def test_summary_parses_passive_tcpdump_and_dns_name():
     assert report["destination_ports"] == {"443": 1}
     assert report["other_hostnames_seen"] == ["ota.example.net"]
     assert candidate not in str(report)
+
+
+def test_summary_auto_detects_unique_8883_source():
+    candidate = "192.168.50.44"
+    capture = (
+        f"tcp 6 100 ESTABLISHED src={candidate} dst=18.1.2.3 "
+        "sport=50000 dport=8883\n"
+    )
+    report = summarize(capture, "auto")
+    assert report["destination_ports"] == {"8883": 1}
+    assert candidate not in str(report)
+
+
+def test_summary_auto_fails_closed_on_ambiguous_sources():
+    capture = "\n".join(
+        [
+            "tcp 6 100 ESTABLISHED src=192.168.50.44 dst=18.1.2.3 sport=1 dport=8883",
+            "tcp 6 100 ESTABLISHED src=192.168.50.45 dst=18.1.2.4 sport=2 dport=8883",
+        ]
+    )
+    import pytest
+
+    with pytest.raises(ValueError, match="exactly one outbound-8883 source"):
+        summarize(capture, "auto")

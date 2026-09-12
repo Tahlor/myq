@@ -197,3 +197,25 @@ The next software-only lane is passive natural-traffic observation. Use
 capture with `tools/router_traffic_summary.py`. This must not alter router
 firewall/DNS state or generate device traffic. Known outbound TCP/8883 is
 baseline; new destination ports or hostnames are the high-value evidence.
+
+## 2026-09-12 bounded passive traffic observation
+
+After router restart, the existing 60-second passive capture completed successfully.
+The capture used the historically verified G0401 source identity and sampled router
+conntrack once per second without generating device traffic or changing router
+configuration. The sanitized summary contained 61 observations, all of the same
+single outbound TCP/8883 connection to the same cloud endpoint. No TCP/443,
+HTTP, DNS, alternate broker, CDN, update, or other destination was observed in
+the window.
+
+This does not prove that a rare scheduled OTA check can never occur. Combined
+with the exact-APK result that G0401 has no app-side firmware transport, however,
+it substantially lowers the expected value of further short active/passive
+software probing. Continued long-term passive observation is safe if convenient,
+but the high-value software-only firmware/credential acquisition paths are now
+considered exhausted enough to justify a targeted hardware investigation.
+
+Hardware work should have a narrow goal: identify firmware/NVM storage and the
+per-device TLS-PSK provenance without destructive changes, reset/re-pair, or
+attempted garage actuation. Production Broadlink -> Pi3 Python cloud operation
+remains independent of this research lane.

@@ -178,3 +178,22 @@ the owner's G0401 showed no firmware/update keys in raw state and null
 `firmware_available=false` in the typed state DTO. Current firmware acquisition
 therefore remains a passive OTA/device-network lane; no updater was invoked.
 
+
+## 2026-09-11 exact APK OTA closure and passive next step
+
+The exact 5.243.1.73243 APK contains real firmware transports, but their
+callers classify them away from G0401. `cxs/api/devices/{deviceId}/hw/firmwareInfo`
+and `startFirmwareUpgrade` are used by the camera/Tend firmware flow, including
+camera wake-up logic and the `camera_firmware_update` feature. The v6
+`devices/locks/.../firmware` routes use lock-specific models and services.
+
+The Smart Garage Hub path still only refreshes the normal device DTO and reads
+`mandatory_update_status`; no G0401 firmware package/download/start transport
+was found. Treat this APK lane as closed for current G0401 firmware acquisition
+unless a future APK adds a new route or caller.
+
+The next software-only lane is passive natural-traffic observation. Use
+`scripts/capture_passive_g0401_traffic.sh` on Pi3 and summarize the ignored raw
+capture with `tools/router_traffic_summary.py`. This must not alter router
+firewall/DNS state or generate device traffic. Known outbound TCP/8883 is
+baseline; new destination ports or hostnames are the high-value evidence.

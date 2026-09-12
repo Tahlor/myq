@@ -86,6 +86,23 @@ Static triage of the exact installed official APK for cloud hosts, local
 setup/provisioning, transport, TLS, Wi-Fi, and BLE clues. Decompile output
 stays ignored.
 
-See docs/LIVE_RUNBOOK.md for the current issue #9 execution order. Direct
-cloud remains experimental/current-2026 evidence only, and pymyq is permanently
-deprecated.
+See docs/LIVE_RUNBOOK.md for the current issue #9 execution order. The
+Pi-native Python cloud client is the production provider; Superbox remains a
+disabled research/recovery path, and pymyq is permanently deprecated.
+
+## android_firmware_surface_audit.py
+
+Offline audit of exact-APK firmware/update surfaces. It shortlists exact
+firmware/update symbols and Retrofit routes, then classifies whether the app
+contains a transport relevant to G0401. Current 5.243.1.73243 evidence shows
+camera/Tend CXS firmware flows and lock-specific firmware APIs, but no G0401
+Smart Garage Hub firmware download/start path.
+
+## router_traffic_summary.py
+
+Summarize passive router metadata for the G0401 from conntrack, router logs,
+or textual tcpdump output. The summary redacts the opener LAN address and
+separates the known connect*.myqdevice.com / TCP-8883 baseline from other
+hosts and destination ports.
+
+    python tools/router_traffic_summary.py captures/lan/passive.txt --candidate-ip <g0401-ip>

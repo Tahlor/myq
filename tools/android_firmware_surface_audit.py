@@ -40,6 +40,14 @@ VALUE_RE = re.compile(r'^\s*value\s*=\s*"(?P<value>[^"]*)"')
 URL_RE = re.compile(r'https?://[^\s"<>]+', re.IGNORECASE)
 HOST_RE = re.compile(r"\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|cloud)\b", re.IGNORECASE)
 ROUTE_SIGNAL_RE = re.compile(r"(?:^|[/_.-])(firmware|update|upgrade|ota|manifest)(?:$|[/_.-])", re.IGNORECASE)
+ROUTE_SHORTLIST_RE = re.compile(
+    r'value\s*=\s*"[^"]*(?:firmware|update|upgrade|ota|manifest)', re.IGNORECASE
+)
+PRIMITIVE_CONTEXT_RE = re.compile(
+    r"firmware|mandatory_update_status|latest_available_firmware_version|"
+    r"firmware_available|vkp_current_firmware_version|myq_firmware_version",
+    re.IGNORECASE,
+)
 
 
 def _smali_files(root: Path) -> list[Path]:
@@ -77,9 +85,10 @@ def _method_at(index: int, ranges: list[tuple[int, int, str]]) -> str:
     return "<class-scope>"
 
 
-def _retrofit_routes(lines: list[str], path: str) -> list[dict[str, Any]]:
+def _retrofit_routes(
+    lines: list[str], path: str, method_ranges: list[tuple[int, int, str]]
+) -> list[dict[str, Any]]:
     routes: list[dict[str, Any]] = []
-    method_ranges = _method_ranges(lines)
     active_kind: str | None = None
     for index, line in enumerate(lines):
         annotation = ANNOTATION_RE.match(line)
@@ -117,48 +126,58 @@ def audit(root: Path) -> dict[str, Any]:
     route_candidates: list[dict[str, Any]] = []
     primitive_refs: list[dict[str, Any]] = []
     network_literals: set[str] = set()
+    files_scanned = 0
+    files_deep_parsed = 0
 
     for file_path in _smali_files(root):
+        files_scanned += 1
         text = file_path.read_text(encoding="utf-8", errors="replace")
+        has_target = any(literal in text for literal in TARGET_LITERALS)
+        has_route_candidate = "Lretrofit2/http/" in text and bool(ROUTE_SHORTLIST_RE.search(text))
+        if not has_target and not has_route_candidate:
+            continue
+
+        files_deep_parsed += 1
         lines = text.splitlines()
         rel = _relative(file_path, root)
         ranges = _method_ranges(lines)
 
-        for index, line in enumerate(lines):
-            for literal in TARGET_LITERALS:
-                if literal in line:
-                    target_refs.append(
-                        {
-                            "symbol": literal,
-                            "path": rel,
-                            "line": index + 1,
-                            "method": _method_at(index, ranges),
-                        }
+        if has_target:
+            for index, line in enumerate(lines):
+                for literal in TARGET_LITERALS:
+                    if literal in line:
+                        target_refs.append(
+                            {
+                                "symbol": literal,
+                                "path": rel,
+                                "line": index + 1,
+                                "method": _method_at(index, ranges),
+                            }
+                        )
+
+                if not PRIMITIVE_CONTEXT_RE.search(text):
+                    continue
+                for primitive in DOWNLOAD_PRIMITIVES:
+                    if primitive not in line:
+                        continue
+                    nearby = "\n".join(
+                        lines[max(0, index - 24) : min(len(lines), index + 25)]
                     )
-            for primitive in DOWNLOAD_PRIMITIVES:
-                if primitive in line:
-                    method = _method_at(index, ranges)
-                    method_text = "\n".join(
-                        lines[start : end + 1]
-                        for start, end, signature in ranges
-                        if signature == method
-                    ) if False else ""
-                    nearby = "\n".join(lines[max(0, index - 24) : min(len(lines), index + 25)])
-                    if re.search(r"firmware|update|upgrade|manifest", nearby, re.IGNORECASE):
+                    if PRIMITIVE_CONTEXT_RE.search(nearby):
                         primitive_refs.append(
                             {
                                 "primitive": primitive,
                                 "path": rel,
                                 "line": index + 1,
-                                "method": method,
+                                "method": _method_at(index, ranges),
                             }
                         )
 
-        route_candidates.extend(_retrofit_routes(lines, rel))
-
-        if re.search(r"firmware|mandatory_update_status|latest_available_firmware_version", text, re.IGNORECASE):
             network_literals.update(URL_RE.findall(text))
             network_literals.update(HOST_RE.findall(text))
+
+        if has_route_candidate:
+            route_candidates.extend(_retrofit_routes(lines, rel, ranges))
 
     unique_refs = sorted(
         {tuple(sorted(item.items())) for item in target_refs},
@@ -174,6 +193,8 @@ def audit(root: Path) -> dict[str, Any]:
         "download_primitive_refs": primitive_refs,
         "network_literals_in_firmware_files": sorted(network_literals),
         "summary": {
+            "files_scanned": files_scanned,
+            "files_deep_parsed": files_deep_parsed,
             "target_ref_count": len(target_refs),
             "retrofit_route_candidate_count": len(route_candidates),
             "download_primitive_ref_count": len(primitive_refs),
